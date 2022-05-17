@@ -1,0 +1,46 @@
+[package]
+name = "wart-worker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
+
+[dependencies]
+futures = "0.3"
+futures-core = "0.3"
+futures-util = "0.3"
+tokio = { version = "1", features = ["full"]}
+tokio-stream = "0.1"
+async-stream = "0.3"
+async-channel = "1"
+crossbeam = "0.8"
+crossbeam-channel = "0.5"
+crossbeam-utils = "0.8"
+prost = "0.10"
+tonic = "0.7"
+anyhow = "1"
+thiserror = "1"
+mobc = "0.7"
+mobc-redis = "0.7"
+serde = { version = "1", features = ["derive"]}
+serde_yaml = "0.8"
+lazy_static = "1"
+uuid = { version = "1", features = ["v4", "fast-rng", "macro-diagnostics"]}
+# reqwest = "0.11"
+# rayon = "1"
+# bytes = "1"
+# r2d2 = "0.8"
+# redis = { version = "0.21", features = ["tokio-comp", "connection-manager", "r2d2", "cluster"]}
+wasmtime = "0.35"
+wasmtime-wasi = "0.35"
+wit-bindgen-wasmtime = { git = "https://github.com/bytecodealliance/wit-bindgen.git" }
+
+[build-dependencies]
+tonic-build = "0.7"

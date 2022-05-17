@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package wart_types;
+
+message Series {
+    message BoolSeries {
+        repeated bool data = 1;
+    }
+
+    message Int32Series {
+        repeated int32 data = 1;
+    }
+
+    message Int64Series {
+        repeated int64 data = 1;
+    }
+
+    message Float32Series {
+        repeated float data = 1;
+    }
+
+    message Float64Series {
+        repeated double data = 1;
+    }
+
+    message StringSeries {
+        repeated string data = 1;
+    }
+
+    oneof values {
+        BoolSeries bool_values = 1;
+        Int32Series int32_values = 2;
+        Int64Series int64_values = 3;
+        Float32Series float32_values = 6;
+        Float64Series float64_values = 7;
+        StringSeries string_values = 8;
+    }
+}
+
+message DataFrame {
+    repeated string headers = 1;
+    repeated Series columns = 2;
+    optional string comment = 3;
+}

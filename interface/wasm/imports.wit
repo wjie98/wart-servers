@@ -1,0 +1,52 @@
+variant node-id {
+    i64(s64),
+    txt(string),
+}
+
+variant series-id {
+    i64(list<s64>),
+    txt(list<string>),
+}
+
+variant value {
+    nil,
+    bol(bool),
+    i32(s32),
+    i64(s64),
+    f32(float32),
+    f64(float64),
+    txt(string),
+}
+
+variant series {
+    nil,
+    bol(list<bool>),
+    i32(list<s32>),
+    i64(list<s64>),
+    f32(list<float32>),
+    f64(list<float64>),
+    txt(list<string>),
+}
+
+type row = list<value>
+type table = list<series>
+
+enum future-error {
+    empty,
+    channel-dropped,
+    channel-closed,
+}
+
+resource future-row
+resource future-table
+
+get-future-row: function(x: future-row) -> expected<row, future-error>
+get-future-table: function(x: future-table) -> expected<table, future-error>
+
+async-query-kv: function(keys: list<string>) -> expected<future-row, future-error>
+async-query-node: function(id: node-id, tag: string, keys: list<string>) -> expected<future-row, future-error>
+async-choice-nodes: function(tag: string, number: s32) -> expected<future-table, future-error>
+async-query-neighbors: function(id: node-id, tag: string, keys: list<string>, reversely: bool) -> expected<future-table, future-error>
+
+select-nodes: function(id: series-id) -> s64
+select-edges: function(src: series-id, dst: series-id) -> s64

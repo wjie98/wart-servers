@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package wart_storage;
+
+import "wart-types.proto";
+
+/*
+space_name: String = "nebula:${space_id}"
+tag: Tag or EdgeType
+key: String
+*/
+
+service WartStorage {
+    //随机选择节点
+    rpc ChoiceNodes(ChoiceNodesRequest) returns(StorageResponse);
+
+    //获取节点属性
+    rpc FetchNode(FetchNodeRequest) returns(StorageResponse);
+
+    //获取边的属性
+    rpc FetchNeighbors(FetchNeighborsRequest) returns(StorageResponse);
+}
+
+
+message ChoiceNodesRequest {
+    string space_name = 1;
+    string tag = 2;
+    int32 number = 3;
+}
+
+message FetchNodeRequest{
+    string space_name = 1;
+    oneof node_id {
+        int64 as_int = 2;
+        string as_str = 3;
+    }
+    string tag = 4;
+    repeated string keys = 5;
+}
+
+message FetchNeighborsRequest{
+    string space_name = 1;
+    oneof node_id {
+        int64 as_int = 2;
+        string as_str = 3;
+    }
+    string tag = 4;
+    repeated string keys = 5;
+    bool reversely = 6;
+}
+
+message StorageResponse {
+    string space_name = 1;
+    string comment = 2;
+    int64 latency = 3;
+    int32 error_code = 4;
+    string error_msg = 5;
+    wart_types.DataFrame data = 6;
+}

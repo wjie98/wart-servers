@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package wart_worker;
+
+import "wart-types.proto";
+
+service WartWorker {
+    rpc OpenSession(OpenSessionRequest) returns(OpenSessionResponse);
+    rpc CloseSession(CloseSessionRequest) returns(CloseSessionResponse);
+    rpc StreamingRun(stream StreamingRunRequest) returns(stream StreamingRunResponse);
+    rpc UpdateStore(stream UpdateStoreRequest) returns(stream UpdateStoreResponse);
+}
+
+message OpenSessionRequest {
+    bytes program = 1;
+    string space_name = 2;
+    uint32 io_timeout = 3;
+    uint32 ex_timeout = 4;
+}
+
+message OpenSessionResponse {
+    message Ok {
+        string token = 1;
+    }
+
+    message Err {
+        string message = 1;
+    }
+
+    oneof result {
+        Ok ok = 1;
+        Err err = 2;
+    }
+}
+
+message CloseSessionRequest {
+    string token = 1;
+}
+
+message CloseSessionResponse {
+}
+
+message StreamingRunRequest {
+    message Config {
+        string token = 1;
+    }
+
+    message Args {
+        repeated string args = 1;
+    }
+
+    oneof data {
+        Config config = 1;
+        Args args = 2;
+    }
+}
+
+message StreamingRunResponse {
+    optional string errors = 1;
+    optional wart_types.DataFrame nodes_table = 2;
+    optional wart_types.DataFrame edges_table = 3;
+}
+
+message UpdateStoreRequest {
+    enum MergeType {
+        DEL = 0;
+        ADD = 1;
+        MOV = 2;
+    };
+    string token = 1;
+    wart_types.Series.StringSeries keys = 2;
+    wart_types.Series vals = 3;
+    MergeType merge_type = 4;
+}
+
+message UpdateStoreResponse {
+    uint64 ok_count = 1;
+}
