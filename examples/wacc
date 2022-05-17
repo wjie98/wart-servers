@@ -1,0 +1,32 @@
+#!/bin/bash
+
+WART=$(cd `dirname $0`/.. && pwd)
+
+WASI_SDK=$HOME/wasi-sdk-14.0
+CXX=$WASI_SDK/bin/clang++
+
+CXXFLAGS="-O3 --std=c++17 -fno-exceptions -Wall -I$WART/wasm/include -I$WART/wasm/capi"
+
+# LDFLAGS="-lm -L$WART/wasm -lwasm \
+# -Wl,--export=__wasm_call_ctors \
+# -Wl,--export=__wasm_call_dtors \
+# -Wl,--export=canonical_abi_realloc \
+# -Wl,--export=canonical_abi_free \
+# "
+# -Wl,--no-entry \
+# -Wl,--allow-undefined \
+# -Wl,--strip-all \
+
+LDFLAGS="-lm -L$WART/wasm -lwasm \
+-Wl,--export=__wasm_call_ctors \
+-Wl,--export=__wasm_call_dtors \
+-Wl,--export=canonical_abi_realloc \
+-Wl,--export=canonical_abi_free \
+"
+
+SRC=$1
+if [ -z $SRC ]; then
+    echo "usage: wacc sampler.cpp"
+else
+    $CXX $SRC -o ${SRC%.cpp}.wasm $CXXFLAGS $LDFLAGS
+fi
