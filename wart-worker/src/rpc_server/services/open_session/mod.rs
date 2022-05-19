@@ -23,11 +23,7 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
     } = request;
 
     let module = tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
-        let mut config = wasmtime::Config::default();
-        // config.async_support(true);
-        config.epoch_interruption(true);
-        // config.consume_fuel(true);
-        // config.wasm_reference_types(true);
+        let config = SandboxManager::<Storage>::default_config();
         let manager = SandboxManager::<Storage>::from_bytes(&program, &config)?;
         manager.module.serialize()
     })

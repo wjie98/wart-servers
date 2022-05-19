@@ -46,6 +46,12 @@ where
     T::FutureRow: Send + 'static,
     T::FutureTable: Send + 'static,
 {
+    pub fn default_config() -> Config {
+        let mut config = Config::default();
+        config.async_support(true);
+        config.epoch_interruption(true);
+        config
+    }
     pub fn from_module(module: &[u8], config: &Config) -> Result<Self> {
         let engine = Engine::new(config)?;
         let module = unsafe { Module::deserialize(&engine, module)? };

@@ -40,7 +40,7 @@ uuid = { version = "1", features = ["v4", "fast-rng", "macro-diagnostics"]}
 # redis = { version = "0.21", features = ["tokio-comp", "connection-manager", "r2d2", "cluster"]}
 wasmtime = "0.35"
 wasmtime-wasi = "0.35"
-wit-bindgen-wasmtime = { git = "https://github.com/bytecodealliance/wit-bindgen.git" }
+wit-bindgen-wasmtime = { git = "https://github.com/bytecodealliance/wit-bindgen.git", features = ["async"] }
 
 [build-dependencies]
 tonic-build = "0.7"

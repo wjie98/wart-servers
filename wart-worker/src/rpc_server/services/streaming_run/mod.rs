@@ -79,11 +79,7 @@ async fn streaming_run_config(
                     .query_async(&mut *con)
                     .await?;
 
-            let mut config = wasmtime::Config::default();
-            // config.async_support(true);
-            config.epoch_interruption(true);
-            // config.consume_fuel(true);
-            // config.wasm_reference_types(true);
+            let config = SandboxManager::<Storage>::default_config();
             let sandbox_manager = SandboxManager::<Storage>::from_module(&module, &config)?;
             let storage_manager = StorageManager::new(space_name, token, io_timeout, ex_timeout);
             Ok((sandbox_manager, storage_manager))

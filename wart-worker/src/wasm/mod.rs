@@ -8,8 +8,7 @@ use query::QueryRequest;
 
 pub mod utils;
 
-use std::cell::RefCell;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Mutex};
 
 #[derive(Clone)]
 pub struct Storage {
@@ -63,14 +62,15 @@ impl StorageManager {
 
 #[derive(Debug)]
 pub struct FutureRow {
-    rx: RefCell<Option<oneshot::Receiver<(Vec<String>, imports::Row)>>>,
+    rx: Mutex<Option<oneshot::Receiver<(Vec<String>, imports::Row)>>>,
 }
 
 #[derive(Debug)]
 pub struct FutureTable {
-    rx: RefCell<Option<oneshot::Receiver<(Vec<String>, imports::Table)>>>,
+    rx: Mutex<Option<oneshot::Receiver<(Vec<String>, imports::Table)>>>,
 }
 
+#[wit_bindgen_wasmtime::async_trait]
 impl imports::Imports for Storage {
     type FutureRow = FutureRow;
     type FutureTable = FutureTable;
@@ -217,7 +217,7 @@ impl imports::Imports for Storage {
         }
     }
 
-    fn async_choice_nodes(
+    async fn async_choice_nodes(
         &mut self,
         tag: &str,
         number: i32,
@@ -234,15 +234,16 @@ impl imports::Imports for Storage {
         };
 
         self.io_tx
-            .blocking_send(query)
+            .send(query)
+            .await
             .map_err(|_| imports::FutureError::ChannelClosed)?;
 
         Ok(Self::FutureTable {
-            rx: RefCell::new(Some(rx)),
+            rx: Mutex::new(Some(rx)),
         })
     }
 
-    fn async_query_node(
+    async fn async_query_node(
         &mut self,
         id: imports::NodeId<'_>,
         tag: &str,
@@ -264,15 +265,16 @@ impl imports::Imports for Storage {
         };
 
         self.io_tx
-            .blocking_send(query)
+            .send(query)
+            .await
             .map_err(|_| imports::FutureError::ChannelClosed)?;
 
         Ok(Self::FutureRow {
-            rx: RefCell::new(Some(rx)),
+            rx: Mutex::new(Some(rx)),
         })
     }
 
-    fn async_query_neighbors(
+    async fn async_query_neighbors(
         &mut self,
         id: imports::NodeId<'_>,
         tag: &str,
@@ -296,15 +298,19 @@ impl imports::Imports for Storage {
         };
 
         self.io_tx
-            .blocking_send(query)
+            .send(query)
+            .await
             .map_err(|_| imports::FutureError::ChannelClosed)?;
 
         Ok(Self::FutureTable {
-            rx: RefCell::new(Some(rx)),
+            rx: Mutex::new(Some(rx)),
         })
     }
 
-    fn async_query_kv(&mut self, keys: Vec<&str>) -> Result<Self::FutureRow, imports::FutureError> {
+    async fn async_query_kv(
+        &mut self,
+        keys: Vec<&str>,
+    ) -> Result<Self::FutureRow, imports::FutureError> {
         let (tx, rx) = oneshot::channel();
         let query = QueryRequest::QueryKV {
             key: format!("wart:store:{}", self.token),
@@ -314,41 +320,38 @@ impl imports::Imports for Storage {
         };
 
         self.io_tx
-            .blocking_send(query)
+            .send(query)
+            .await
             .map_err(|_| imports::FutureError::ChannelClosed)?;
 
         Ok(Self::FutureRow {
-            rx: RefCell::new(Some(rx)),
+            rx: Mutex::new(Some(rx)),
         })
     }
 
-    fn get_future_row(
+    async fn get_future_row(
         &mut self,
         self_: &Self::FutureRow,
     ) -> Result<imports::Row, imports::FutureError> {
-        let rx = match self_.rx.borrow_mut().take() {
+        let rx = match self_.rx.lock().await.take() {
             Some(rx) => rx,
             None => Err(imports::FutureError::Empty)?,
         };
 
-        let (_headers, row) = rx
-            .blocking_recv()
-            .map_err(|_| imports::FutureError::ChannelDropped)?;
+        let (_headers, row) = rx.await.map_err(|_| imports::FutureError::ChannelDropped)?;
         Ok(row)
     }
 
-    fn get_future_table(
+    async fn get_future_table(
         &mut self,
         self_: &Self::FutureTable,
     ) -> Result<imports::Table, imports::FutureError> {
-        let rx = match self_.rx.borrow_mut().take() {
+        let rx = match self_.rx.lock().await.take() {
             Some(rx) => rx,
             None => Err(imports::FutureError::Empty)?,
         };
 
-        let (_headers, table) = rx
-            .blocking_recv()
-            .map_err(|_| imports::FutureError::ChannelDropped)?;
+        let (_headers, table) = rx.await.map_err(|_| imports::FutureError::ChannelDropped)?;
         Ok(table)
     }
 }
