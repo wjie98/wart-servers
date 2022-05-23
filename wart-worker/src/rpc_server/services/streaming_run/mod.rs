@@ -48,17 +48,18 @@ async fn streaming_run_config(
             let Config { token } = config;
             let store_key = format!("wart:session:{}", token);
             let mut con = GLOBALS.redis.get().await?;
-            let (space_name, module, timeout): (String, Vec<u8>, u64) = redis::pipe()
+            let (space_name, module, io_timeout, ex_timeout): (String, Vec<u8>, u64, u64) = redis::pipe()
                 .atomic()
                 .hget(&store_key, "space_name")
                 .hget(&store_key, "module")
+                .hget(&store_key, "io_timeout")
                 .hget(&store_key, "ex_timeout")
                 .query_async(&mut *con)
                 .await?;
 
             let config = SandboxManager::<Storage>::default_config();
             let sandbox_manager = SandboxManager::<Storage>::from_module(&module, &config)?;
-            let storage_manager = StorageManager::new(space_name, token, timeout);
+            let storage_manager = StorageManager::new(space_name, token, io_timeout, ex_timeout);
             Ok((sandbox_manager, storage_manager))
         }
         Data::Args(_) => Err(anyhow!("invalid config"))?,
@@ -81,9 +82,12 @@ async fn streaming_run_args(
         }
     });
 
+    let io_timeout = storage_manager.io_timeout;
+    let ex_timeout = storage_manager.ex_timeout;
+
     let (io_tx, mut io_rx) = mpsc::channel::<QueryRequest>(1024);
     let ioq_handle = tokio::spawn(async move {
-        let duration = time::Duration::from_millis(60000);
+        let duration = time::Duration::from_millis(io_timeout);
         while let Some(query) = io_rx.recv().await {
             if let Err(err) = time::timeout(duration, query.into_query()).await {
                 eprintln!("query.into_query(): {}", err);
@@ -95,7 +99,7 @@ async fn streaming_run_args(
     while let Some(request) = istream.next().await {
         match request {
             Ok(request) => {
-                let duration = time::Duration::from_millis(storage_manager.timeout);
+                let duration = time::Duration::from_millis(ex_timeout);
                 match time::timeout(
                     duration,
                     streaming_run_sandbox(

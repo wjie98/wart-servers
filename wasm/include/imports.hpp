@@ -221,7 +221,7 @@ std::variant<imports_future_error_t, future_table> __async_query_neighbors_impl(
     else return future_table(&ret0);
 }
 
-std::variant<imports_future_error_t, future_table> async_query_neighbors(std::string_view id, std::string_view tag, std::vector<std::string_view>& keys, bool reversely) {
+std::variant<imports_future_error_t, future_table> async_query_neighbors(std::string_view id, std::string_view tag, std::span<std::string_view> keys, bool reversely = false) {
     imports_node_id_t id0;
     id0.tag = IMPORTS_NODE_ID_TXT;
     id0.val.txt.ptr = const_cast<char*>(id.data());
@@ -229,7 +229,7 @@ std::variant<imports_future_error_t, future_table> async_query_neighbors(std::st
     return __async_query_neighbors_impl(id0, tag, keys, reversely);
 }
 
-std::variant<imports_future_error_t, future_table> async_query_neighbors(int64_t id, std::string_view tag, std::vector<std::string_view>& keys, bool reversely) {
+std::variant<imports_future_error_t, future_table> async_query_neighbors(int64_t id, std::string_view tag, std::span<std::string_view> keys, bool reversely = false) {
     imports_node_id_t id0;
     id0.tag = IMPORTS_NODE_ID_I64;
     id0.val.i64 = id;
