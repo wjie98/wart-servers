@@ -1,4 +1,4 @@
-WASI_SDK=$(HOME)/wasi-sdk-14.0
+WASI_SDK=$(HOME)/wasi-sdk-15.0
 CC = $(WASI_SDK)/bin/clang
 CXX = $(WASI_SDK)/bin/clang++
 AR = $(WASI_SDK)/bin/ar

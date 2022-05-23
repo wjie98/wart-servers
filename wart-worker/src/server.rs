@@ -1,4 +1,5 @@
 mod bindgen;
+mod backend;
 mod rpc_server;
 mod wasm;
 
@@ -8,7 +9,8 @@ use rpc_server::Router;
 use lazy_static::lazy_static;
 use serde::Deserialize;
 
-use mobc_redis::{redis, RedisConnectionManager};
+use backend::RedisConnectionManager;
+use backend::StorageConnectionManager;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -26,7 +28,10 @@ pub struct Globals {
     config: Config,
 
     #[allow(dead_code)]
-    redis_pool: mobc::Pool<RedisConnectionManager>,
+    redis: mobc::Pool<RedisConnectionManager>,
+
+    #[allow(dead_code)]
+    storage: mobc::Pool<StorageConnectionManager>,
 }
 
 lazy_static! {
@@ -45,37 +50,28 @@ lazy_static! {
             }
         };
 
-        let redis_pool = {
-            let client = redis::Client::open(format!(
-                "redis://{}:{}/",
-                config.redis_server.ip(),
-                config.redis_server.port()
-            ))
-            .unwrap();
-            let manager = RedisConnectionManager::new(client);
+        let redis = {
+            let manager = RedisConnectionManager::new(config.redis_server);
             mobc::Pool::builder().max_open(64).build(manager)
         };
 
-        Globals { config, redis_pool }
+        
+        let storage = {
+            let manager = StorageConnectionManager::new(config.storage_server);
+            mobc::Pool::builder().max_open(64).build(manager)
+        };
+
+        Globals {
+            config,
+            redis,
+            storage,
+        }
     };
 }
 
 #[tokio::main]
 async fn main() -> Result<(), tonic::transport::Error> {
     println!("rpc_server: {}", GLOBALS.config.rpc_server);
-
-    // {
-    //     let mut conn = GLOBALS.redis_pool.get().await.unwrap();
-
-    //     let (s,): (i32,) = redis::pipe()
-    //         .set::<&str, i32>("a", 1)
-    //         .ignore()
-    //         .get("a")
-    //         .query_async(&mut *conn)
-    //         .await
-    //         .unwrap();
-    //     println!("{}", s);
-    // }
 
     let router = WartWorkerServer::new(Router::new());
     tonic::transport::Server::builder()

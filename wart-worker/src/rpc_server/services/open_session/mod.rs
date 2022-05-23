@@ -2,7 +2,6 @@ use crate::bindgen::*;
 use crate::wasm::{SandboxManager, Storage};
 use crate::GLOBALS;
 use anyhow::Result;
-use mobc_redis::redis;
 use tonic::{Request, Response, Status};
 
 pub async fn open_session(
@@ -32,7 +31,7 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
     let token = uuid::Uuid::new_v4().to_string();
     let store_key1 = format!("wart:session:{}", token);
     let store_key2 = format!("wart:store:{}", token);
-    let mut con = GLOBALS.redis_pool.get().await?;
+    let mut con = GLOBALS.redis.get().await?;
     let _: () = redis::pipe()
         .atomic()
         .hset(&store_key1, "space_name", &space_name)

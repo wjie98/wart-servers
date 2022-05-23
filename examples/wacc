@@ -2,7 +2,7 @@
 
 WART=$(cd `dirname $0`/.. && pwd)
 
-WASI_SDK=$HOME/wasi-sdk-14.0
+WASI_SDK=$HOME/wasi-sdk-15.0
 CXX=$WASI_SDK/bin/clang++
 
 CXXFLAGS="-O3 --std=c++17 -fno-exceptions -Wall -I$WART/wasm/include -I$WART/wasm/capi"

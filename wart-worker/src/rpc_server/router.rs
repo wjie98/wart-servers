@@ -37,11 +37,7 @@ impl WartWorker for Router {
         &self,
         request: Request<Streaming<StreamingRunRequest>>,
     ) -> Result<Response<Self::StreamingRunStream>, Status> {
-        use super::services::streaming_run::streaming_run;
-        match streaming_run(request).await {
-            Ok(s) => Ok(s),
-            Err(err) => Err(Status::internal(err.to_string())),
-        }
+        super::services::streaming_run::streaming_run(request).await
     }
 
     async fn update_store(

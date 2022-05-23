@@ -8,54 +8,41 @@ use query::QueryRequest;
 
 pub mod utils;
 
+use anyhow::Result;
 use tokio::sync::{mpsc, oneshot, Mutex};
 
 #[derive(Clone)]
 pub struct Storage {
     pub space_name: String,
     pub token: String,
-    pub io_timeout: u64,
-    pub ex_timeout: u64,
     io_tx: mpsc::Sender<QueryRequest>,
     pub selected_nodes: DataFrame,
     pub selected_edges: DataFrame,
 }
 
+#[derive(Clone)]
 pub struct StorageManager {
     pub space_name: String,
     pub token: String,
-    pub io_timeout: u64,
-    pub ex_timeout: u64,
-    mpsc_tx: mpsc::Sender<QueryRequest>,
-    mpsc_rx: Option<mpsc::Receiver<QueryRequest>>,
+    pub timeout: u64,
 }
 
 impl StorageManager {
-    pub fn new(space_name: String, token: String, io_timeout: u32, ex_timeout: u32) -> Self {
-        let (mpsc_tx, mpsc_rx) = mpsc::channel(1024);
+    pub fn new(space_name: String, token: String, timeout: u64) -> Self {
         Self {
             space_name,
             token,
-            io_timeout: io_timeout as u64,
-            ex_timeout: ex_timeout as u64,
-            mpsc_tx,
-            mpsc_rx: Some(mpsc_rx),
+            timeout,
         }
     }
 
-    pub fn take_rx(&mut self) -> Option<mpsc::Receiver<QueryRequest>> {
-        self.mpsc_rx.take()
-    }
-
-    pub fn new_imports(&self) -> Storage {
+    pub fn instantiate(&self, io_tx: mpsc::Sender<QueryRequest>) -> Storage {
         Storage {
             space_name: self.space_name.clone(),
             token: self.token.clone(),
-            io_timeout: self.io_timeout,
-            ex_timeout: self.ex_timeout,
-            io_tx: self.mpsc_tx.clone(),
-            selected_nodes: DataFrame::default(),
-            selected_edges: DataFrame::default(),
+            io_tx,
+            selected_nodes: Default::default(),
+            selected_edges: Default::default(),
         }
     }
 }
@@ -230,7 +217,6 @@ impl imports::Imports for Storage {
                 number,
             },
             sink: tx,
-            ttl: self.io_timeout,
         };
 
         self.io_tx
@@ -261,7 +247,6 @@ impl imports::Imports for Storage {
                 keys: keys.into_iter().map(|x| x.into()).collect(),
             },
             sink: tx,
-            ttl: self.io_timeout,
         };
 
         self.io_tx
@@ -294,7 +279,6 @@ impl imports::Imports for Storage {
                 reversely,
             },
             sink: tx,
-            ttl: self.io_timeout,
         };
 
         self.io_tx
@@ -316,7 +300,6 @@ impl imports::Imports for Storage {
             key: format!("wart:store:{}", self.token),
             fields: keys.into_iter().map(|x| x.into()).collect(),
             sink: tx,
-            ttl: self.io_timeout,
         };
 
         self.io_tx

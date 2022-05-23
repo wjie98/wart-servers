@@ -1,7 +1,6 @@
 use crate::bindgen::*;
 use crate::GLOBALS;
 use anyhow::Result;
-use mobc_redis::redis;
 use tonic::{Request, Response, Status};
 
 pub async fn close_session(
@@ -18,7 +17,7 @@ pub async fn close_session_impl(request: CloseSessionRequest) -> Result<CloseSes
 
     let store_key1 = format!("wart:session:{}", token);
     let store_key2 = format!("wart:store:{}", token);
-    let mut con = GLOBALS.redis_pool.get().await?;
+    let mut con = GLOBALS.redis.get().await?;
     let _: () = redis::pipe()
         .atomic()
         .unlink(&store_key1)

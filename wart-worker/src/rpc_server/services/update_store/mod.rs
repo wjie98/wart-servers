@@ -2,7 +2,7 @@ use crate::bindgen::*;
 use crate::GLOBALS;
 use anyhow::{anyhow, Result};
 use futures::StreamExt;
-use mobc_redis::redis::AsyncCommands;
+use redis::AsyncCommands;
 
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -56,7 +56,7 @@ async fn write_to_redis(request: UpdateStoreRequest) -> Result<UpdateStoreRespon
     let vals = vals.and_then(|s| s.values);
 
     let store_key = format!("wart:store:{}", token);
-    let mut con = GLOBALS.redis_pool.get().await?;
+    let mut con = GLOBALS.redis.get().await?;
 
     if !con.exists::<_, bool>(&store_key).await? {
         Err(anyhow!("no session: {}", token))?;
