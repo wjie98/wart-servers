@@ -15,6 +15,7 @@ C_OBJECTS := $(patsubst %.c, %.o, $(shell find ./capi -name "*.c"))
 $(info * C_OBJECTS: $(C_OBJECTS))
 $(info * OBJECTS: $(OBJECTS))
 
+.PHONY: all
 all: $(OBJECTS) $(C_OBJECTS)
 	$(AR) -rv libwart.a $(OBJECTS) $(C_OBJECTS)
 
