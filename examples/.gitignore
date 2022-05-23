@@ -1,3 +1,4 @@
 /.vscode
 /**/*.wasm
 /**/__pycache__
+/rpc_client
