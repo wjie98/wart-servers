@@ -24,15 +24,17 @@ pub struct Storage {
 pub struct StorageManager {
     pub space_name: String,
     pub token: String,
-    pub timeout: u64,
+    pub io_timeout: u64,
+    pub ex_timeout: u64,
 }
 
 impl StorageManager {
-    pub fn new(space_name: String, token: String, timeout: u64) -> Self {
+    pub fn new(space_name: String, token: String, io_timeout: u64, ex_timeout: u64) -> Self {
         Self {
             space_name,
             token,
-            timeout,
+            io_timeout,
+            ex_timeout,
         }
     }
 
