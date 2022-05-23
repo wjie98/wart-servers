@@ -1,8 +1,6 @@
 #include <imports.h>
 
-#define TCB_SPAN_NAMESPACE_NAME std
-#include <tcb/span.hpp>
-
+#include <span>
 #include <string>
 #include <memory>
 #include <tuple>
