@@ -1,4 +1,3 @@
-// wit_bindgen_wasmtime::export!("../interface/wasm/imports.wit");
 wit_bindgen_wasmtime::export!({
     paths: ["../interface/wasm/imports.wit"],
     async: [
