@@ -125,14 +125,14 @@ impl imports::Imports for Storage {
             let n = match src {
                 imports::SeriesId::I64(ids) => {
                     let data: Vec<i64> = ids.iter().map(|s| s.get()).collect();
-                    self.selected_nodes.columns.push(Series {
+                    self.selected_edges.columns.push(Series {
                         values: Some(series::Values::Int64Values(series::Int64Series { data })),
                     });
                     ids.len()
                 }
                 imports::SeriesId::Txt(ids) => {
                     let data: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
-                    self.selected_nodes.columns.push(Series {
+                    self.selected_edges.columns.push(Series {
                         values: Some(series::Values::StringValues(series::StringSeries { data })),
                     });
                     ids.len()
@@ -142,14 +142,14 @@ impl imports::Imports for Storage {
             let _ = match dst {
                 imports::SeriesId::I64(ids) => {
                     let data: Vec<i64> = ids.iter().map(|s| s.get()).collect();
-                    self.selected_nodes.columns.push(Series {
+                    self.selected_edges.columns.push(Series {
                         values: Some(series::Values::Int64Values(series::Int64Series { data })),
                     });
                     ids.len() as i64
                 }
                 imports::SeriesId::Txt(ids) => {
                     let data: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
-                    self.selected_nodes.columns.push(Series {
+                    self.selected_edges.columns.push(Series {
                         values: Some(series::Values::StringValues(series::StringSeries { data })),
                     });
                     ids.len() as i64
