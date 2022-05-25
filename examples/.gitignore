@@ -1,4 +1,4 @@
 /.vscode
 /**/*.wasm
 /**/__pycache__
-/rpc_client
+/rpc_client/wart_*.py
