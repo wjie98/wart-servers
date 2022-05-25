@@ -40,5 +40,5 @@ message Series {
 message DataFrame {
     repeated string headers = 1;
     repeated Series columns = 2;
-    optional string comment = 3;
+    string comment = 3;
 }

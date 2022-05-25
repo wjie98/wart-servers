@@ -56,9 +56,9 @@ message StreamingRunRequest {
 }
 
 message StreamingRunResponse {
-    optional string errors = 1;
-    optional wart_types.DataFrame nodes_table = 2;
-    optional wart_types.DataFrame edges_table = 3;
+    string errors = 1;
+    wart_types.DataFrame nodes_table = 2;
+    wart_types.DataFrame edges_table = 3;
 }
 
 message UpdateStoreRequest {

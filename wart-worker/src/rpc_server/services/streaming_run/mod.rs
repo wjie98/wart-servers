@@ -160,7 +160,7 @@ async fn streaming_run_sandbox(
             let (nodes_table, edges_table) = (imports.selected_nodes, imports.selected_edges);
 
             let response = StreamingRunResponse {
-                errors: None,
+                errors: "none".into(),
                 nodes_table: Some(nodes_table),
                 edges_table: Some(edges_table),
             };
