@@ -38,8 +38,8 @@ void test_query_nodes(imports::storage& store) {
         { "age", -1LL },
     });
 
-    std::string_view keys[] = {"name", "age"};  // 目前返回的table的headers会附带tag作为前缀
-    auto r = *store.query_nodes("player102", "player", keys);
+    // 目前返回的table的headers会附带tag作为前缀
+    auto r = *store.query_nodes("player102", "player", {"name", "age"});
 
     auto name = r.view()["player.name"]->as_txt();
     auto age = r.view()["player.age"]->as_i64();
@@ -57,7 +57,8 @@ void test_query_neighbors(imports::storage& store) {
     };
     auto table = imports::data_frame::open("test_query_neighbors(player101)", default_values);
 
-    auto [dst, attr] = *store.query_neighbors("player101", "serve", {"start_year"});  // 这里用了c++17的结构化绑定
+    std::string_view keys[] = {"start_year"};
+    auto [dst, attr] = *store.query_neighbors("player101", "serve", keys);  // 这里用了c++17的结构化绑定
 
     auto n = dst.view().size();
     for (size_t i = 0; i < n; i++) {
