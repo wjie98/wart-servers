@@ -63,6 +63,11 @@ impl StorageManager {
 
     pub async fn get_sandbox(&self, args: &[String]) -> Result<Sandbox<Storage>> {
         let wasi_ctx = WasiCtxBuilder::new().args(&args)?.build();
+        // let wasi_ctx = WasiCtxBuilder::new()
+        //     .inherit_stdout()
+        //     .inherit_stderr()
+        //     .args(&args)?
+        //     .build();
 
         let imports = Storage {
             space_name: self.space_name.clone(),

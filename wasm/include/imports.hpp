@@ -188,7 +188,7 @@ inline bool __lt_imports_item(const imports_item_t& x, const imports_item_t& y) 
 }
 
 inline bool __eq_imports_item(const imports_item_t& x, const imports_item_t& y) {
-    return std::string_view(x.key.ptr, x.key.len) < std::string_view(y.key.ptr, y.key.len);
+    return std::string_view(x.key.ptr, x.key.len) == std::string_view(y.key.ptr, y.key.len);
 }
 
 inline bool __lt_imports_series(const imports_series_t& x, const imports_series_t& y) {
@@ -196,7 +196,7 @@ inline bool __lt_imports_series(const imports_series_t& x, const imports_series_
 }
 
 inline bool __eq_imports_series(const imports_series_t& x, const imports_series_t& y) {
-    return std::string_view(x.key.ptr, x.key.len) < std::string_view(y.key.ptr, y.key.len);
+    return std::string_view(x.key.ptr, x.key.len) == std::string_view(y.key.ptr, y.key.len);
 }
 
 class row_view {

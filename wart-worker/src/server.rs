@@ -72,6 +72,8 @@ lazy_static! {
 async fn main() -> Result<(), tonic::transport::Error> {
     // use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
     // tracing_subscriber::registry().with(fmt::layer()).init();
+    tracing_subscriber::fmt::init();
+
     log::info!("rpc_server: {}", GLOBALS.config.rpc_server);
 
     let router = WartWorkerServer::new(Router::new());
