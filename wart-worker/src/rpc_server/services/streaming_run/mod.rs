@@ -10,6 +10,8 @@ use tokio::time;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
+use crate::GLOBALS;
+
 type StreamingRunStream = ReceiverStream<Result<StreamingRunResponse, Status>>;
 
 pub async fn streaming_run(
@@ -53,7 +55,7 @@ async fn streaming_run_args(
     storage_manager: StorageManager,
 ) {
     let engine = storage_manager.get_engine();
-    let clk_handle = tokio::spawn(async move {
+    let clk_handle = GLOBALS.epoch_interrupter.spawn(async move {
         let duration = time::Duration::from_millis(100);
         let mut interval = time::interval(duration);
         loop {
@@ -73,7 +75,11 @@ async fn streaming_run_args(
 
                 match ret {
                     Ok(result) => match result {
-                        Ok(resp) => {
+                        Ok(tables) => {
+                            let resp = StreamingRunResponse {
+                                tables,
+                                logs: vec![],
+                            };
                             if let Err(_) = mpsc_tx.send(Ok(resp)).await {
                                 break;
                             }
@@ -101,22 +107,24 @@ async fn streaming_run_args(
 async fn streaming_run_sandbox(
     request: StreamingRunRequest,
     storage_manager: StorageManager,
-) -> Result<StreamingRunResponse> {
+) -> Result<Vec<DataFrame>> {
     match request.data.ok_or(anyhow!("empty args"))? {
         streaming_run_request::Data::Args(args) => {
             let args = args.args;
             let mut sandbox = storage_manager.get_sandbox(&args).await?;
 
             sandbox.store.epoch_deadline_async_yield_and_update(1);
-            let _ = sandbox.call_async().await?;
-
-            let tables = sandbox.store.into_data().imports.into_tables().await;
-
-            let response = StreamingRunResponse {
-                tables,
-                logs: vec![],
+            let tables = match sandbox.call_async().await {
+                Ok(_) => {
+                    let tables = sandbox.store.into_data().imports.into_tables().await;
+                    tables
+                }
+                Err(err) => {
+                    log::error!("streaming_run_sandbox: {}", err);
+                    vec![]
+                }
             };
-            Ok(response)
+            Ok(tables)
         }
         _ => Err(anyhow!("invalid args"))?,
     }

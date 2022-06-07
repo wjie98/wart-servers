@@ -32,6 +32,9 @@ pub struct Globals {
 
     #[allow(dead_code)]
     storage: mobc::Pool<StorageConnectionManager>,
+
+    #[allow(dead_code)]
+    epoch_interrupter: tokio::runtime::Handle,
 }
 
 lazy_static! {
@@ -60,13 +63,31 @@ lazy_static! {
             mobc::Pool::builder().max_open(64).build(manager)
         };
 
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let epoch_interrupter = runtime.handle().clone();
+        std::thread::spawn(move || {
+            runtime.block_on(async {
+                loop {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1000)).await;
+                }
+            })
+        });
+
         Globals {
             config,
             redis,
             storage,
+            epoch_interrupter,
         }
     };
 }
+
+struct CustomLayer;
+
+impl<S> tracing_subscriber::Layer<S> for CustomLayer where S: tracing::Subscriber {}
 
 #[tokio::main]
 async fn main() -> Result<(), tonic::transport::Error> {
