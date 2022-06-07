@@ -1,5 +1,7 @@
 import grpc
 from rpc_client import *
+
+import numpy as np
 import pandas as pd
 
 from typing import *
@@ -7,15 +9,28 @@ import os
 
 def to_pd(table: DataFrame) -> pd.DataFrame:
     data = {}
-    for i, s in enumerate(table.columns):
-        series = s.bool_values.data \
-            or s.int32_values.data \
-            or s.int64_values.data \
-            or s.float32_values.data \
-            or s.float64_values.data \
-            or s.string_values.data
-        data[i] = pd.Series(list(series))
-    return pd.DataFrame(data)
+    for h, s in zip(table.headers, table.columns):
+        if s.bool_values.data:
+            series = list(s.bool_values.data)
+            data[h] = pd.Series(series, dtype=np.bool8)
+        elif s.int32_values.data:
+            series = list(s.int32_values.data)
+            data[h] = pd.Series(series, dtype=np.int32)
+        elif s.int64_values.data:
+            series = list(s.int64_values.data)
+            data[h] = pd.Series(series, dtype=np.int64)
+        elif s.float32_values.data:
+            series = list(s.float32_values.data)
+            data[h] = pd.Series(series, dtype=np.float32)
+        elif s.float64_values.data:
+            series = list(s.float64_values.data)
+            data[h] = pd.Series(series, dtype=np.float64)
+        elif s.string_values.data:
+            series = list(s.string_values.data)
+            data[h] = pd.Series(series, dtype=np.str0)
+        else:
+            return None
+    return table.comment, pd.DataFrame(data)
         
 
 def update_store_iter(token: str, pairs: Dict[str, int], batch_size = 2):
@@ -62,7 +77,7 @@ def run():
         resp = stub.OpenSession(OpenSessionRequest(
             space_name = "nebula:basketballplayer",
             program = program,
-            io_timeout = 1000, # 单次IO限时
+            io_timeout = 1000, # 单次IO限时(废弃)
             ex_timeout = 2000, # 单次采样限时
         ))
         
@@ -70,19 +85,18 @@ def run():
         token = resp.ok.token
         print("token: ", token)
         
-        # 更新session全局状态
-        pairs = {"a": 1, "b": 1, "c": 1}
-        for resp in stub.UpdateStore(update_store_iter(token, pairs)):
-            assert resp.ok_count > 0
+        # # 更新session全局状态
+        # pairs = {"a": 1, "b": 1, "c": 1}
+        # for resp in stub.UpdateStore(update_store_iter(token, pairs)):
+        #     assert resp.ok_count > 0
         
         # 运行采样脚本
         args = [["arg1"], []] # 运行两次，可以设置命令行参数也可以不设置
         for resp in stub.StreamingRun(streaming_run_iter(token, args)):
-            print("nodes_table:")
-            print(to_pd(resp.nodes_table))
-            
-            print("edges_table:")
-            print(to_pd(resp.edges_table))
+            for t in resp.tables:
+                name, table = to_pd(t)
+                print("name:", name)
+                print(table)
             print("==================================")
         
         # 关闭采样session

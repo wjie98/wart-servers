@@ -1,13 +1,3 @@
-variant node-id {
-    i64(s64),
-    txt(string),
-}
-
-variant series-id {
-    i64(list<s64>),
-    txt(list<string>),
-}
-
 variant value {
     nil,
     bol(bool),
@@ -18,7 +8,7 @@ variant value {
     txt(string),
 }
 
-variant series {
+variant vector {
     nil,
     bol(list<bool>),
     i32(list<s32>),
@@ -28,25 +18,43 @@ variant series {
     txt(list<string>),
 }
 
-type row = list<value>
-type table = list<series>
-
-enum future-error {
-    empty,
-    channel-dropped,
-    channel-closed,
+record item {
+    key: string,
+    val: value,
 }
 
-resource future-row
-resource future-table
+record series {
+    key: string,
+    val: vector,
+}
 
-get-future-row: function(x: future-row) -> expected<row, future-error>
-get-future-table: function(x: future-table) -> expected<table, future-error>
+type row = list<item>
+type table = list<series>
 
-async-query-kv: function(keys: list<string>) -> expected<future-row, future-error>
-async-query-node: function(id: node-id, tag: string, keys: list<string>) -> expected<future-row, future-error>
-async-choice-nodes: function(tag: string, number: s32) -> expected<future-table, future-error>
-async-query-neighbors: function(id: node-id, tag: string, keys: list<string>, reversely: bool) -> expected<future-table, future-error>
+resource data-frame {
+    static new: function(name: string, defa: row) -> option<data-frame>
+    push: function(data: row) -> option<u64>
+    size: function() -> option<u64>
+}
 
-select-nodes: function(id: series-id) -> s64
-select-edges: function(src: series-id, dst: series-id) -> s64
+enum merge-type {
+    add, mov,
+}
+
+resource storage {
+    static new: function() -> option<storage>
+    
+    choice-nodes: function(tag: string, number: s32) -> option<vector>
+    query-nodes: function(id: value, tag: string, keys: list<string>) -> option<row>
+    query-neighbors: function(id: value, tag: string, keys: list<string>, reversely: bool) -> option<tuple<vector, table>>
+
+    query-kv: function(keys: list<string>, defa: value) -> option<vector>
+    update-kv: function(keys: list<string>, vals: vector, ops: merge-type) -> option<u64>
+}
+
+enum log-level {
+    trace, debug, info, warn, error,
+}
+
+log: function(lv: log-level, msg: string)
+log-enabled: function(lv: log-level) -> bool

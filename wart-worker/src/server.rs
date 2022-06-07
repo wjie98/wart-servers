@@ -1,5 +1,5 @@
-mod bindgen;
 mod backend;
+mod bindgen;
 mod rpc_server;
 mod wasm;
 
@@ -55,7 +55,6 @@ lazy_static! {
             mobc::Pool::builder().max_open(64).build(manager)
         };
 
-        
         let storage = {
             let manager = StorageConnectionManager::new(config.storage_server);
             mobc::Pool::builder().max_open(64).build(manager)
@@ -71,7 +70,9 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() -> Result<(), tonic::transport::Error> {
-    println!("rpc_server: {}", GLOBALS.config.rpc_server);
+    // use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+    // tracing_subscriber::registry().with(fmt::layer()).init();
+    log::info!("rpc_server: {}", GLOBALS.config.rpc_server);
 
     let router = WartWorkerServer::new(Router::new());
     tonic::transport::Server::builder()

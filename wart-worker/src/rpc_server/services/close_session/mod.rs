@@ -15,14 +15,25 @@ pub async fn close_session(
 pub async fn close_session_impl(request: CloseSessionRequest) -> Result<CloseSessionResponse> {
     let CloseSessionRequest { token } = request;
 
-    let store_key1 = format!("wart:session:{}", token);
-    let store_key2 = format!("wart:store:{}", token);
     let mut con = GLOBALS.redis.get().await?;
-    let _: () = redis::pipe()
-        .atomic()
-        .unlink(&store_key1)
-        .ignore()
-        .unlink(&store_key2)
+
+    let key = format!("wart:session:{}", token);
+    let (epoch,): (u64,) = redis::pipe()
+        .hget(&key, "epoch")
+        .query_async(&mut *con)
+        .await?;
+
+    for ep in 0..=(epoch + 1) {
+        let key = format!("wart:store:{}:{}", token, ep);
+        redis::pipe()
+            .unlink(&key)
+            .ignore()
+            .query_async(&mut *con)
+            .await?;
+    }
+
+    redis::pipe()
+        .unlink(&key)
         .ignore()
         .query_async(&mut *con)
         .await?;

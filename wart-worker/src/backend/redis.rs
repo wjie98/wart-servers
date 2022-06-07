@@ -1,5 +1,5 @@
-use redis::{Client, RedisError};
 use redis::aio::Connection;
+use redis::{Client, RedisError};
 
 use std::net::SocketAddr;
 
@@ -13,7 +13,9 @@ impl RedisConnectionManager {
             SocketAddr::V4(x) => format!("redis://{}:{}/", x.ip(), x.port()),
             SocketAddr::V6(x) => format!("redis://[{}]:{}/", x.ip(), x.port()),
         };
-        Self { client: Client::open(url).unwrap() }
+        Self {
+            client: Client::open(url).unwrap(),
+        }
     }
 }
 
@@ -32,5 +34,3 @@ impl mobc::Manager for RedisConnectionManager {
         Ok(con)
     }
 }
-
-

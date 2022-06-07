@@ -151,6 +151,9 @@ typedef struct {
 } imports_option_data_frame_t;
 typedef struct {
   bool is_some;
+} imports_option_empty_t;
+typedef struct {
+  bool is_some;
   uint64_t val;
 } imports_option_u64_t;
 typedef struct {
@@ -159,28 +162,24 @@ typedef struct {
 } imports_option_storage_t;
 typedef struct {
   bool is_some;
-  imports_vector_t val;
-} imports_option_vector_t;
+  imports_series_t val;
+} imports_option_series_t;
 typedef struct {
   bool is_some;
   imports_row_t val;
 } imports_option_row_t;
-void imports_tuple2_vector_table_free(imports_tuple2_vector_table_t *ptr) {
-  imports_vector_free(&ptr->f0);
-  imports_table_free(&ptr->f1);
-}
 typedef struct {
   bool is_some;
-  imports_tuple2_vector_table_t val;
-} imports_option_tuple2_vector_table_t;
+  imports_table_t val;
+} imports_option_table_t;
 
 __attribute__((aligned(8)))
 static uint8_t RET_AREA[24];
 __attribute__((import_module("imports"), import_name("data-frame::new")))
 void __wasm_import_imports_data_frame_new(int32_t, int32_t, int32_t, int32_t, int32_t);
-bool imports_data_frame_new(imports_string_t *name, imports_row_t *defa, imports_data_frame_t *ret0) {
+bool imports_data_frame_new(imports_string_t *name, imports_row_t *default, imports_data_frame_t *ret0) {
   int32_t ptr = (int32_t) &RET_AREA;
-  __wasm_import_imports_data_frame_new((int32_t) (*name).ptr, (int32_t) (*name).len, (int32_t) (*defa).ptr, (int32_t) (*defa).len, ptr);
+  __wasm_import_imports_data_frame_new((int32_t) (*name).ptr, (int32_t) (*name).len, (int32_t) (*default).ptr, (int32_t) (*default).len, ptr);
   imports_option_data_frame_t option;
   switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
     case 0: {
@@ -198,12 +197,11 @@ bool imports_data_frame_new(imports_string_t *name, imports_row_t *defa, imports
   return option.is_some;
 }
 __attribute__((import_module("imports"), import_name("data-frame::push")))
-void __wasm_import_imports_data_frame_push(int32_t, int32_t, int32_t, int32_t);
-bool imports_data_frame_push(imports_data_frame_t self, imports_row_t *data, uint64_t *ret0) {
-  int32_t ptr = (int32_t) &RET_AREA;
-  __wasm_import_imports_data_frame_push((self).idx, (int32_t) (*data).ptr, (int32_t) (*data).len, ptr);
-  imports_option_u64_t option;
-  switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
+int32_t __wasm_import_imports_data_frame_push(int32_t, int32_t, int32_t);
+bool imports_data_frame_push(imports_data_frame_t self, imports_row_t *data, imports_empty_t *ret0) {
+  int32_t ret = __wasm_import_imports_data_frame_push((self).idx, (int32_t) (*data).ptr, (int32_t) (*data).len);
+  imports_option_empty_t option;
+  switch (ret) {
     case 0: {
       option.is_some = false;
       
@@ -212,7 +210,7 @@ bool imports_data_frame_push(imports_data_frame_t self, imports_row_t *data, uin
     case 1: {
       option.is_some = true;
       
-      option.val = (uint64_t) (*((int64_t*) (ptr + 8)));
+      
       break;
     }
   }*ret0 = option.val;
@@ -262,10 +260,10 @@ bool imports_storage_new(imports_storage_t *ret0) {
 }
 __attribute__((import_module("imports"), import_name("storage::choice-nodes")))
 void __wasm_import_imports_storage_choice_nodes(int32_t, int32_t, int32_t, int32_t, int32_t);
-bool imports_storage_choice_nodes(imports_storage_t self, imports_string_t *tag, int32_t number, imports_vector_t *ret0) {
+bool imports_storage_choice_nodes(imports_storage_t self, imports_string_t *tag, int32_t number, imports_series_t *ret0) {
   int32_t ptr = (int32_t) &RET_AREA;
   __wasm_import_imports_storage_choice_nodes((self).idx, (int32_t) (*tag).ptr, (int32_t) (*tag).len, number, ptr);
-  imports_option_vector_t option;
+  imports_option_series_t option;
   switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
     case 0: {
       option.is_some = false;
@@ -275,46 +273,49 @@ bool imports_storage_choice_nodes(imports_storage_t self, imports_string_t *tag,
     case 1: {
       option.is_some = true;
       imports_vector_t variant;
-      variant.tag = (int32_t) (*((uint8_t*) (ptr + 4)));
+      variant.tag = (int32_t) (*((uint8_t*) (ptr + 12)));
       switch ((int32_t) variant.tag) {
         case 0: {
           break;
         }
         case 1: {
-          variant.val.bol = (imports_list_bool_t) { (bool*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
+          variant.val.bol = (imports_list_bool_t) { (bool*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) };
           break;
         }
         case 2: {
-          variant.val.i32 = (imports_list_s32_t) { (int32_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
+          variant.val.i32 = (imports_list_s32_t) { (int32_t*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) };
           break;
         }
         case 3: {
-          variant.val.i64 = (imports_list_s64_t) { (int64_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
+          variant.val.i64 = (imports_list_s64_t) { (int64_t*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) };
           break;
         }
         case 4: {
-          variant.val.f32 = (imports_list_float32_t) { (float*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
+          variant.val.f32 = (imports_list_float32_t) { (float*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) };
           break;
         }
         case 5: {
-          variant.val.f64 = (imports_list_float64_t) { (double*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
+          variant.val.f64 = (imports_list_float64_t) { (double*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) };
           break;
         }
         case 6: {
-          variant.val.txt = (imports_list_string_t) { (imports_string_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
+          variant.val.txt = (imports_list_string_t) { (imports_string_t*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) };
           break;
         }
       }
       
-      option.val = variant;
+      option.val = (imports_series_t) {
+        (imports_string_t) { (char*)(*((int32_t*) (ptr + 4))), (size_t)(*((int32_t*) (ptr + 8))) },
+        variant,
+      };
       break;
     }
   }*ret0 = option.val;
   return option.is_some;
 }
-__attribute__((import_module("imports"), import_name("storage::query-nodes")))
-void __wasm_import_imports_storage_query_nodes(int32_t, int32_t, int64_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
-bool imports_storage_query_nodes(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, imports_row_t *ret0) {
+__attribute__((import_module("imports"), import_name("storage::query-node")))
+void __wasm_import_imports_storage_query_node(int32_t, int32_t, int64_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
+bool imports_storage_query_node(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, imports_row_t *ret0) {
   int32_t variant;
   int64_t variant6;
   int32_t variant7;
@@ -369,7 +370,7 @@ bool imports_storage_query_nodes(imports_storage_t self, imports_value_t *id, im
     }
   }
   int32_t ptr = (int32_t) &RET_AREA;
-  __wasm_import_imports_storage_query_nodes((self).idx, variant, variant6, variant7, (int32_t) (*tag).ptr, (int32_t) (*tag).len, (int32_t) (*keys).ptr, (int32_t) (*keys).len, ptr);
+  __wasm_import_imports_storage_query_node((self).idx, variant, variant6, variant7, (int32_t) (*tag).ptr, (int32_t) (*tag).len, (int32_t) (*keys).ptr, (int32_t) (*keys).len, ptr);
   imports_option_row_t option;
   switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
     case 0: {
@@ -388,7 +389,7 @@ bool imports_storage_query_nodes(imports_storage_t self, imports_value_t *id, im
 }
 __attribute__((import_module("imports"), import_name("storage::query-neighbors")))
 void __wasm_import_imports_storage_query_neighbors(int32_t, int32_t, int64_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
-bool imports_storage_query_neighbors(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, bool reversely, imports_tuple2_vector_table_t *ret0) {
+bool imports_storage_query_neighbors(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, bool reversely, imports_table_t *ret0) {
   int32_t variant;
   int64_t variant6;
   int32_t variant7;
@@ -444,7 +445,7 @@ bool imports_storage_query_neighbors(imports_storage_t self, imports_value_t *id
   }
   int32_t ptr = (int32_t) &RET_AREA;
   __wasm_import_imports_storage_query_neighbors((self).idx, variant, variant6, variant7, (int32_t) (*tag).ptr, (int32_t) (*tag).len, (int32_t) (*keys).ptr, (int32_t) (*keys).len, reversely, ptr);
-  imports_option_tuple2_vector_table_t option;
+  imports_option_table_t option;
   switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
     case 0: {
       option.is_some = false;
@@ -453,106 +454,19 @@ bool imports_storage_query_neighbors(imports_storage_t self, imports_value_t *id
     }
     case 1: {
       option.is_some = true;
-      imports_vector_t variant8;
-      variant8.tag = (int32_t) (*((uint8_t*) (ptr + 4)));
-      switch ((int32_t) variant8.tag) {
-        case 0: {
-          break;
-        }
-        case 1: {
-          variant8.val.bol = (imports_list_bool_t) { (bool*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 2: {
-          variant8.val.i32 = (imports_list_s32_t) { (int32_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 3: {
-          variant8.val.i64 = (imports_list_s64_t) { (int64_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 4: {
-          variant8.val.f32 = (imports_list_float32_t) { (float*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 5: {
-          variant8.val.f64 = (imports_list_float64_t) { (double*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 6: {
-          variant8.val.txt = (imports_list_string_t) { (imports_string_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-      }
       
-      option.val = (imports_tuple2_vector_table_t) {
-        variant8,
-        (imports_table_t) { (imports_series_t*)(*((int32_t*) (ptr + 16))), (size_t)(*((int32_t*) (ptr + 20))) },
-      };
+      option.val = (imports_table_t) { (imports_series_t*)(*((int32_t*) (ptr + 4))), (size_t)(*((int32_t*) (ptr + 8))) };
       break;
     }
   }*ret0 = option.val;
   return option.is_some;
 }
 __attribute__((import_module("imports"), import_name("storage::query-kv")))
-void __wasm_import_imports_storage_query_kv(int32_t, int32_t, int32_t, int32_t, int64_t, int32_t, int32_t);
-bool imports_storage_query_kv(imports_storage_t self, imports_list_string_t *keys, imports_value_t *defa, imports_vector_t *ret0) {
-  int32_t variant;
-  int64_t variant6;
-  int32_t variant7;
-  switch ((int32_t) (*defa).tag) {
-    case 0: {
-      variant = 0;
-      variant6 = 0;
-      variant7 = 0;
-      break;
-    }
-    case 1: {
-      const bool *payload0 = &(*defa).val.bol;
-      variant = 1;
-      variant6 = (int64_t) *payload0;
-      variant7 = 0;
-      break;
-    }
-    case 2: {
-      const int32_t *payload1 = &(*defa).val.i32;
-      variant = 2;
-      variant6 = (int64_t) *payload1;
-      variant7 = 0;
-      break;
-    }
-    case 3: {
-      const int64_t *payload2 = &(*defa).val.i64;
-      variant = 3;
-      variant6 = *payload2;
-      variant7 = 0;
-      break;
-    }
-    case 4: {
-      const float *payload3 = &(*defa).val.f32;
-      variant = 4;
-      variant6 = ((union { float a; int32_t b; }){ *payload3 }).b;
-      variant7 = 0;
-      break;
-    }
-    case 5: {
-      const double *payload4 = &(*defa).val.f64;
-      variant = 5;
-      variant6 = ((union { double a; int64_t b; }){ *payload4 }).b;
-      variant7 = 0;
-      break;
-    }
-    case 6: {
-      const imports_string_t *payload5 = &(*defa).val.txt;
-      variant = 6;
-      variant6 = (int64_t) (int32_t) (*payload5).ptr;
-      variant7 = (int32_t) (*payload5).len;
-      break;
-    }
-  }
+void __wasm_import_imports_storage_query_kv(int32_t, int32_t, int32_t, int32_t);
+bool imports_storage_query_kv(imports_storage_t self, imports_row_t *data, imports_row_t *ret0) {
   int32_t ptr = (int32_t) &RET_AREA;
-  __wasm_import_imports_storage_query_kv((self).idx, (int32_t) (*keys).ptr, (int32_t) (*keys).len, variant, variant6, variant7, ptr);
-  imports_option_vector_t option;
+  __wasm_import_imports_storage_query_kv((self).idx, (int32_t) (*data).ptr, (int32_t) (*data).len, ptr);
+  imports_option_row_t option;
   switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
     case 0: {
       option.is_some = false;
@@ -561,104 +475,19 @@ bool imports_storage_query_kv(imports_storage_t self, imports_list_string_t *key
     }
     case 1: {
       option.is_some = true;
-      imports_vector_t variant8;
-      variant8.tag = (int32_t) (*((uint8_t*) (ptr + 4)));
-      switch ((int32_t) variant8.tag) {
-        case 0: {
-          break;
-        }
-        case 1: {
-          variant8.val.bol = (imports_list_bool_t) { (bool*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 2: {
-          variant8.val.i32 = (imports_list_s32_t) { (int32_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 3: {
-          variant8.val.i64 = (imports_list_s64_t) { (int64_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 4: {
-          variant8.val.f32 = (imports_list_float32_t) { (float*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 5: {
-          variant8.val.f64 = (imports_list_float64_t) { (double*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-        case 6: {
-          variant8.val.txt = (imports_list_string_t) { (imports_string_t*)(*((int32_t*) (ptr + 8))), (size_t)(*((int32_t*) (ptr + 12))) };
-          break;
-        }
-      }
       
-      option.val = variant8;
+      option.val = (imports_row_t) { (imports_item_t*)(*((int32_t*) (ptr + 4))), (size_t)(*((int32_t*) (ptr + 8))) };
       break;
     }
   }*ret0 = option.val;
   return option.is_some;
 }
 __attribute__((import_module("imports"), import_name("storage::update-kv")))
-void __wasm_import_imports_storage_update_kv(int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t, int32_t);
-bool imports_storage_update_kv(imports_storage_t self, imports_list_string_t *keys, imports_vector_t *vals, imports_merge_type_t ops, uint64_t *ret0) {
-  int32_t variant;
-  int32_t variant6;
-  int32_t variant7;
-  switch ((int32_t) (*vals).tag) {
-    case 0: {
-      variant = 0;
-      variant6 = 0;
-      variant7 = 0;
-      break;
-    }
-    case 1: {
-      const imports_list_bool_t *payload0 = &(*vals).val.bol;
-      variant = 1;
-      variant6 = (int32_t) (*payload0).ptr;
-      variant7 = (int32_t) (*payload0).len;
-      break;
-    }
-    case 2: {
-      const imports_list_s32_t *payload1 = &(*vals).val.i32;
-      variant = 2;
-      variant6 = (int32_t) (*payload1).ptr;
-      variant7 = (int32_t) (*payload1).len;
-      break;
-    }
-    case 3: {
-      const imports_list_s64_t *payload2 = &(*vals).val.i64;
-      variant = 3;
-      variant6 = (int32_t) (*payload2).ptr;
-      variant7 = (int32_t) (*payload2).len;
-      break;
-    }
-    case 4: {
-      const imports_list_float32_t *payload3 = &(*vals).val.f32;
-      variant = 4;
-      variant6 = (int32_t) (*payload3).ptr;
-      variant7 = (int32_t) (*payload3).len;
-      break;
-    }
-    case 5: {
-      const imports_list_float64_t *payload4 = &(*vals).val.f64;
-      variant = 5;
-      variant6 = (int32_t) (*payload4).ptr;
-      variant7 = (int32_t) (*payload4).len;
-      break;
-    }
-    case 6: {
-      const imports_list_string_t *payload5 = &(*vals).val.txt;
-      variant = 6;
-      variant6 = (int32_t) (*payload5).ptr;
-      variant7 = (int32_t) (*payload5).len;
-      break;
-    }
-  }
-  int32_t ptr = (int32_t) &RET_AREA;
-  __wasm_import_imports_storage_update_kv((self).idx, (int32_t) (*keys).ptr, (int32_t) (*keys).len, variant, variant6, variant7, (int32_t) ops, ptr);
-  imports_option_u64_t option;
-  switch ((int32_t) (*((uint8_t*) (ptr + 0)))) {
+int32_t __wasm_import_imports_storage_update_kv(int32_t, int32_t, int32_t, int32_t);
+bool imports_storage_update_kv(imports_storage_t self, imports_row_t *data, imports_merge_type_t ops, imports_empty_t *ret0) {
+  int32_t ret = __wasm_import_imports_storage_update_kv((self).idx, (int32_t) (*data).ptr, (int32_t) (*data).len, (int32_t) ops);
+  imports_option_empty_t option;
+  switch (ret) {
     case 0: {
       option.is_some = false;
       
@@ -667,7 +496,7 @@ bool imports_storage_update_kv(imports_storage_t self, imports_list_string_t *ke
     case 1: {
       option.is_some = true;
       
-      option.val = (uint64_t) (*((int64_t*) (ptr + 8)));
+      
       break;
     }
   }*ret0 = option.val;
@@ -679,8 +508,7 @@ void imports_log(imports_log_level_t lv, imports_string_t *msg) {
   __wasm_import_imports_log((int32_t) lv, (int32_t) (*msg).ptr, (int32_t) (*msg).len);
 }
 __attribute__((import_module("imports"), import_name("log-enabled")))
-int32_t __wasm_import_imports_log_enabled(int32_t);
-bool imports_log_enabled(imports_log_level_t lv) {
-  int32_t ret = __wasm_import_imports_log_enabled((int32_t) lv);
-  return ret;
+void __wasm_import_imports_log_enabled(int32_t, int32_t, int32_t);
+void imports_log_enabled(imports_log_level_t lv, imports_string_t *msg) {
+  __wasm_import_imports_log_enabled((int32_t) lv, (int32_t) (*msg).ptr, (int32_t) (*msg).len);
 }

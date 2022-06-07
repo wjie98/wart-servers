@@ -42,8 +42,8 @@ where
 impl<T> SandboxManager<T>
 where
     T: imports::Imports + Send + 'static,
-    T::FutureRow: Send + 'static,
-    T::FutureTable: Send + 'static,
+    T::DataFrame: Send + 'static,
+    T::Storage: Send + 'static,
 {
     pub fn default_config() -> Config {
         let mut config = Config::default();
@@ -101,8 +101,8 @@ where
 impl<T> Sandbox<T>
 where
     T: imports::Imports + Send + 'static,
-    T::FutureRow: Send + 'static,
-    T::FutureTable: Send + 'static,
+    T::DataFrame: Send + 'static,
+    T::Storage: Send + 'static,
 {
     pub async fn call_ctors(&mut self) -> Result<(), Trap> {
         let __wasm_call_ctors = self

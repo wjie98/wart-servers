@@ -1,102 +1,101 @@
 use crate::bindgen::*;
 
-pub fn dump_to_imports_rows(data: DataFrame) -> (Vec<String>, Vec<imports::Row>) {
+pub fn dump_to_imports_row(data: DataFrame) -> imports::RowResult {
     let DataFrame {
         headers,
         columns,
         comment: _,
     } = data;
 
-    let num_cols = columns
-        .iter()
-        .map(|col| match &col.values {
-            Some(vs) => match vs {
-                series::Values::BoolValues(x) => x.data.len(),
-                series::Values::Int32Values(x) => x.data.len(),
-                series::Values::Int64Values(x) => x.data.len(),
-                series::Values::Float32Values(x) => x.data.len(),
-                series::Values::Float64Values(x) => x.data.len(),
-                series::Values::StringValues(x) => x.data.len(),
-            },
-            None => 0,
-        })
-        .collect::<Vec<usize>>();
-    let num_rows = num_cols.iter().max();
-    if let Some(num_rows) = num_rows {
-        let num_rows = *num_rows;
-
-        let mut rows = vec![];
-        for _ in columns.iter() {
-            rows.push(imports::Row::new());
-        }
-
-        for (j, col) in columns.iter().enumerate() {
-            match &col.values {
-                Some(vs) => match vs {
-                    series::Values::BoolValues(x) => {
-                        for i in 0..num_cols[j] {
-                            rows[i].push(imports::Value::Bol(x.data[i]));
-                        }
-                    }
-                    series::Values::Int32Values(x) => {
-                        for i in 0..num_cols[j] {
-                            rows[i].push(imports::Value::I32(x.data[i]));
-                        }
-                    }
-                    series::Values::Int64Values(x) => {
-                        for i in 0..num_cols[j] {
-                            rows[i].push(imports::Value::I64(x.data[i]));
-                        }
-                    }
-                    series::Values::Float32Values(x) => {
-                        for i in 0..num_cols[j] {
-                            rows[i].push(imports::Value::F32(x.data[i]));
-                        }
-                    }
-                    series::Values::Float64Values(x) => {
-                        for i in 0..num_cols[j] {
-                            rows[i].push(imports::Value::F64(x.data[i]));
-                        }
-                    }
-                    series::Values::StringValues(x) => {
-                        for i in 0..num_cols[j] {
-                            rows[i].push(imports::Value::Txt(x.data[i].clone()));
-                        }
-                    }
+    headers
+        .into_iter()
+        .zip(columns.into_iter())
+        .map(|(h, s)| -> imports::ItemResult {
+            match s.values {
+                Some(v) => match v {
+                    series::Values::BoolValues(x) if !x.data.is_empty() => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::Bol(x.data[0]),
+                    },
+                    series::Values::Int32Values(x) if !x.data.is_empty() => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::I32(x.data[0]),
+                    },
+                    series::Values::Int64Values(x) if !x.data.is_empty() => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::I64(x.data[0]),
+                    },
+                    series::Values::Float32Values(x) if !x.data.is_empty() => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::F32(x.data[0]),
+                    },
+                    series::Values::Float64Values(x) if !x.data.is_empty() => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::F64(x.data[0]),
+                    },
+                    series::Values::StringValues(x) if !x.data.is_empty() => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::Txt(x.data[0].clone()),
+                    },
+                    _ => imports::ItemResult {
+                        key: h,
+                        val: imports::ValueResult::Nil,
+                    },
                 },
-                None => (),
-            };
-
-            for i in num_cols[j]..num_rows {
-                let i = i + num_cols[j];
-                rows[i].push(imports::Value::Nil);
+                None => imports::ItemResult {
+                    key: h,
+                    val: imports::ValueResult::Nil,
+                },
             }
-        }
-        (headers, rows)
-    } else {
-        (headers, vec![])
-    }
+        })
+        // .filter(|s| !matches!(s.val, imports::ValueResult::Nil))
+        .collect::<Vec<_>>()
 }
 
-pub fn dump_to_imports_table(data: DataFrame) -> (Vec<String>, imports::Table) {
+pub fn dump_to_imports_table(data: DataFrame) -> imports::Table {
     let DataFrame {
         headers,
         columns,
         comment: _,
     } = data;
-    let table = columns
+
+    headers
         .into_iter()
-        .map(|s| match s.values {
-            Some(vs) => match vs {
-                series::Values::BoolValues(x) => imports::Series::Bol(x.data),
-                series::Values::Int32Values(x) => imports::Series::I32(x.data),
-                series::Values::Int64Values(x) => imports::Series::I64(x.data),
-                series::Values::Float32Values(x) => imports::Series::F32(x.data),
-                series::Values::Float64Values(x) => imports::Series::F64(x.data),
-                series::Values::StringValues(x) => imports::Series::Txt(x.data),
-            },
-            None => imports::Series::Nil,
+        .zip(columns.into_iter())
+        .map(|(h, s)| -> imports::Series {
+            match s.values {
+                Some(v) => match v {
+                    series::Values::BoolValues(x) => imports::Series {
+                        key: h,
+                        val: imports::VectorResult::Bol(x.data),
+                    },
+                    series::Values::Int32Values(x) => imports::Series {
+                        key: h,
+                        val: imports::VectorResult::I32(x.data),
+                    },
+                    series::Values::Int64Values(x) => imports::Series {
+                        key: h,
+                        val: imports::VectorResult::I64(x.data),
+                    },
+                    series::Values::Float32Values(x) => imports::Series {
+                        key: h,
+                        val: imports::VectorResult::F32(x.data),
+                    },
+                    series::Values::Float64Values(x) => imports::Series {
+                        key: h,
+                        val: imports::VectorResult::F64(x.data),
+                    },
+                    series::Values::StringValues(x) => imports::Series {
+                        key: h,
+                        val: imports::VectorResult::Txt(x.data),
+                    },
+                },
+                None => imports::Series {
+                    key: h,
+                    val: imports::VectorResult::Nil,
+                },
+            }
         })
-        .collect::<imports::Table>();
-    (headers, table)
+        // .filter(|s| !matches!(s.val, imports::Vector::Nil))
+        .collect::<Vec<_>>()
 }

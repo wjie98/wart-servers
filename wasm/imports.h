@@ -29,6 +29,8 @@ extern "C"
   void imports_string_dup(imports_string_t *ret, const char *s);
   void imports_string_free(imports_string_t *ret);
   typedef struct {
+  } imports_empty_t;
+  typedef struct {
     uint8_t tag;
     union {
       bool bol;
@@ -117,30 +119,26 @@ extern "C"
   } imports_table_t;
   void imports_table_free(imports_table_t *ptr);
   typedef uint8_t imports_merge_type_t;
-  #define IMPORTS_MERGE_TYPE_ADD 0
-  #define IMPORTS_MERGE_TYPE_MOV 1
+  #define IMPORTS_MERGE_TYPE_DEL 0
+  #define IMPORTS_MERGE_TYPE_ADD 1
+  #define IMPORTS_MERGE_TYPE_MOV 2
   typedef uint8_t imports_log_level_t;
   #define IMPORTS_LOG_LEVEL_TRACE 0
   #define IMPORTS_LOG_LEVEL_DEBUG 1
   #define IMPORTS_LOG_LEVEL_INFO 2
   #define IMPORTS_LOG_LEVEL_WARN 3
   #define IMPORTS_LOG_LEVEL_ERROR 4
-  typedef struct {
-    imports_vector_t f0;
-    imports_table_t f1;
-  } imports_tuple2_vector_table_t;
-  void imports_tuple2_vector_table_free(imports_tuple2_vector_table_t *ptr);
-  bool imports_data_frame_new(imports_string_t *name, imports_row_t *defa, imports_data_frame_t *ret0);
-  bool imports_data_frame_push(imports_data_frame_t self, imports_row_t *data, uint64_t *ret0);
+  bool imports_data_frame_new(imports_string_t *name, imports_row_t *default, imports_data_frame_t *ret0);
+  bool imports_data_frame_push(imports_data_frame_t self, imports_row_t *data, imports_empty_t *ret0);
   bool imports_data_frame_size(imports_data_frame_t self, uint64_t *ret0);
   bool imports_storage_new(imports_storage_t *ret0);
-  bool imports_storage_choice_nodes(imports_storage_t self, imports_string_t *tag, int32_t number, imports_vector_t *ret0);
-  bool imports_storage_query_nodes(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, imports_row_t *ret0);
-  bool imports_storage_query_neighbors(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, bool reversely, imports_tuple2_vector_table_t *ret0);
-  bool imports_storage_query_kv(imports_storage_t self, imports_list_string_t *keys, imports_value_t *defa, imports_vector_t *ret0);
-  bool imports_storage_update_kv(imports_storage_t self, imports_list_string_t *keys, imports_vector_t *vals, imports_merge_type_t ops, uint64_t *ret0);
+  bool imports_storage_choice_nodes(imports_storage_t self, imports_string_t *tag, int32_t number, imports_series_t *ret0);
+  bool imports_storage_query_node(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, imports_row_t *ret0);
+  bool imports_storage_query_neighbors(imports_storage_t self, imports_value_t *id, imports_string_t *tag, imports_list_string_t *keys, bool reversely, imports_table_t *ret0);
+  bool imports_storage_query_kv(imports_storage_t self, imports_row_t *data, imports_row_t *ret0);
+  bool imports_storage_update_kv(imports_storage_t self, imports_row_t *data, imports_merge_type_t ops, imports_empty_t *ret0);
   void imports_log(imports_log_level_t lv, imports_string_t *msg);
-  bool imports_log_enabled(imports_log_level_t lv);
+  void imports_log_enabled(imports_log_level_t lv, imports_string_t *msg);
   #ifdef __cplusplus
 }
 #endif

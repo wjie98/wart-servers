@@ -2,8 +2,8 @@ use crate::bindgen::*;
 
 use std::net::SocketAddr;
 
-use wart_storage_client::WartStorageClient;
 use tonic::transport::{Channel, Error};
+use wart_storage_client::WartStorageClient;
 
 pub struct StorageConnectionManager {
     pub url: String,

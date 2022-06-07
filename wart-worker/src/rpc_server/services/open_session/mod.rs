@@ -17,7 +17,7 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
     let OpenSessionRequest {
         space_name,
         program,
-        io_timeout,
+        io_timeout: _,
         ex_timeout,
     } = request;
 
@@ -28,29 +28,28 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
     })
     .await??;
 
-    let token = uuid::Uuid::new_v4().to_string();
-    let store_key1 = format!("wart:session:{}", token);
-    let store_key2 = format!("wart:store:{}", token);
     let mut con = GLOBALS.redis.get().await?;
+
+    let token = uuid::Uuid::new_v4().to_string();
+    let key = format!("wart:session:{}", token);
     let _: () = redis::pipe()
         .atomic()
-        .hset(&store_key1, "space_name", &space_name)
+        .hset(&key, "token", &token)
         .ignore()
-        .hset(&store_key1, "token", &token)
+        .hset(&key, "space_name", &space_name)
         .ignore()
-        .hset(&store_key1, "module", &*module)
+        .hset(&key, "epoch", 0)
         .ignore()
-        .hset(&store_key1, "io_timeout", io_timeout)
+        .hset(&key, "module", &*module)
         .ignore()
-        .hset(&store_key1, "ex_timeout", ex_timeout)
-        .ignore()
-        .hset(&store_key2, "__dummy__", &space_name)
+        .hset(&key, "ex_timeout", ex_timeout)
         .ignore()
         .query_async(&mut *con)
         .await?;
 
     let (token,): (String,) = redis::pipe()
-        .hget(&store_key1, "token")
+        .atomic()
+        .hget(&key, "token")
         .query_async(&mut *con)
         .await?;
 

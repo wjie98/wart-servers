@@ -8,7 +8,8 @@ service WartWorker {
     rpc OpenSession(OpenSessionRequest) returns(OpenSessionResponse);
     rpc CloseSession(CloseSessionRequest) returns(CloseSessionResponse);
     rpc StreamingRun(stream StreamingRunRequest) returns(stream StreamingRunResponse);
-    rpc UpdateStore(stream UpdateStoreRequest) returns(stream UpdateStoreResponse);
+    // rpc UpdateStore(stream UpdateStoreRequest) returns(stream UpdateStoreResponse);
+    rpc IncrementEpoch(IncrementEpochRequest) returns(IncrementEpochResponse);
 }
 
 message OpenSessionRequest {
@@ -56,9 +57,16 @@ message StreamingRunRequest {
 }
 
 message StreamingRunResponse {
-    string errors = 1;
-    wart_types.DataFrame nodes_table = 2;
-    wart_types.DataFrame edges_table = 3;
+    repeated wart_types.DataFrame tables = 1;
+    repeated string logs = 2;
+}
+
+message IncrementEpochRequest {
+    string token = 1;
+}
+
+message IncrementEpochResponse {
+    uint64 epoch = 1;
 }
 
 message UpdateStoreRequest {
