@@ -29,7 +29,7 @@ def to_pd(table: DataFrame) -> pd.DataFrame:
             series = list(s.string_values.data)
             data[h] = pd.Series(series, dtype=np.str0)
         else:
-            return None
+            return table.comment, None
     return table.comment, pd.DataFrame(data)
         
 

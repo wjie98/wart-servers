@@ -2,9 +2,6 @@
 #include <cassert>
 #include <imports.hpp>
 
-using imports::log_info;
-using imports::log_error;
-
 template<typename T>
 void ugly_concat_impl(std::stringstream& ss, const T& t) { ss << t; }
 
@@ -75,14 +72,29 @@ void test_query_neighbors(imports::storage& store) {
     }
 }
 
-int main() {
+void test_log() {
+    using imports::log;
+    using imports::log_info;
+    using imports::log_error;
+    using imports::log_enabled;
+    using imports::log_level;
+
     // std::cout和std::cerr不再可用，使用imports里的日志接口。易用性有待优化
     // 临时可以用这个库代替格式化：https://github.com/MU001999/format
     log_error(ugly_concat("hello", ",", "world"));
+
+    if (log_enabled(log_level::info)) {
+        // 复杂的计算可以放在这个控制流里
+        log(log_level::info, "log, yes!");  // 等价于log_info()
+    }
+}
+
+int main() {
 
     auto store = *imports::storage::open();
     test_choice_nodes(store);
     test_query_nodes(store);
     test_query_neighbors(store);
+    test_log();
     return 0;
 }
