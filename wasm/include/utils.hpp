@@ -44,14 +44,27 @@ void __set_string_param(imports_string_t& ret0, const std::string_view param) {
     return {ptr, free};
 }
 
-[[nodiscard]] std::unique_ptr<void, decltype(free)*> __set_span_string_param(imports_list_string_t& ret0, const std::span<std::string> param) {
+// [[nodiscard]] std::unique_ptr<void, decltype(free)*> __set_span_string_param(imports_list_string_t& ret0, const std::span<std::string> param) {
+//     void* ptr = malloc(sizeof(imports_string_t) * param.size());
+    
+//     ret0.ptr = reinterpret_cast<imports_string_t*>(ptr);
+//     ret0.len = param.size();
+
+//     for (size_t i = 0; i < ret0.len; i++) {
+//         __set_string_param(ret0.ptr[i], param[i]);
+//     }
+//     return {ptr, free};
+// }
+
+[[nodiscard]] std::unique_ptr<void, decltype(free)*> __set_span_string_param(imports_list_string_t& ret0, const std::initializer_list<std::string_view> param) {
     void* ptr = malloc(sizeof(imports_string_t) * param.size());
     
     ret0.ptr = reinterpret_cast<imports_string_t*>(ptr);
     ret0.len = param.size();
 
-    for (size_t i = 0; i < ret0.len; i++) {
-        __set_string_param(ret0.ptr[i], param[i]);
+    imports_string_t* p = ret0.ptr;
+    for (auto it = param.begin(); it != param.end(); ++it) {
+        __set_string_param(*p, *it); p++;
     }
     return {ptr, free};
 }
@@ -148,6 +161,19 @@ void __set_item_param(imports_item_t& ret0, const item_param param) {
         __set_item_param(ret0.ptr[i], param[i]);
     }
 
+    return {ptr, free};
+}
+
+[[nodiscard]] std::unique_ptr<void, decltype(free)*> __set_span_item_param(imports_row_t& ret0, std::initializer_list<item_param> param) {
+    void* ptr = malloc(sizeof(imports_item_t) * param.size());
+
+    ret0.ptr = reinterpret_cast<imports_item_t*>(ptr);
+    ret0.len = param.size();
+
+    imports_item_t* p = ret0.ptr;
+    for (auto it = param.begin(); it != param.end(); ++it) {
+        __set_item_param(*p, *it); p ++;
+    }
     return {ptr, free};
 }
 

@@ -23,7 +23,31 @@ class data_frame {
     data_frame(imports_data_frame_t* handle) { this->_handle = *handle; this->_owner = true; }
 public:
     static std::optional<data_frame> open(std::string_view name, std::span<item_param> defa) {
-        
+        return data_frame::open_impl(name, defa);
+    }
+
+    static std::optional<data_frame> open(std::string_view name, std::initializer_list<item_param> defa) {
+        return data_frame::open_impl(name, defa);
+    }
+    
+    void push(std::span<item_param> data) { return this->push_impl(data); }
+    void push(std::initializer_list<item_param> data) { return this->push_impl(data); }
+
+    size_t size() const {
+        uint64_t ret0;
+        if (!imports_data_frame_size(this->_handle, &ret0)) {
+            abort();
+        }
+        return ret0;
+    }
+
+    data_frame(data_frame&& rhs) { this->_handle = rhs._handle; this->_owner = rhs._owner; rhs._owner = false; }
+    ~data_frame() { if (this->_owner) imports_data_frame_free(&this->_handle); }
+    data_frame& operator= (data_frame&& rhs) { this->_handle = rhs._handle; this->_owner = rhs._owner; rhs._owner = false; return *this; }
+
+private:
+    template<typename K>
+    static inline std::optional<data_frame> open_impl(std::string_view name, K&& defa) {
         imports_string_t name0;
         __set_string_param(name0, name);
 
@@ -37,12 +61,8 @@ public:
         return std::nullopt;
     }
 
-    static std::optional<data_frame> open(std::string_view name, std::initializer_list<item_param> defa) {
-        std::vector<item_param> defa0 = defa;
-        return data_frame::open(name, defa0);
-    }
-    
-    void push(std::span<item_param> data) {
+    template<typename K>
+    inline void push_impl(K&& data) {
         imports_row_t data0;
         auto owner = __set_span_item_param(data0, data);
 
@@ -51,23 +71,6 @@ public:
             abort();
         }
     }
-
-    void push(std::initializer_list<item_param> args) {
-        std::vector<item_param> args0 = args;
-        return push(args0);
-    }
-
-    size_t size() const {
-        uint64_t ret0;
-        if (!imports_data_frame_size(this->_handle, &ret0)) {
-            abort();
-        }
-        return ret0;
-    }
-
-    data_frame(data_frame&& rhs) { this->_handle = rhs._handle; this->_owner = rhs._owner; rhs._owner = false; }
-    ~data_frame() { if (this->_owner) imports_data_frame_free(&this->_handle); }
-    data_frame& operator= (data_frame&& rhs) { this->_handle = rhs._handle; this->_owner = rhs._owner; rhs._owner = false; return *this; }
 };
 
 class storage {
@@ -103,8 +106,7 @@ public:
     }
 
     [[nodiscard]] std::optional<row> query_nodes(int64_t id, std::string_view tag, std::initializer_list<std::string_view> keys) {
-        std::vector<std::string_view> keys0 = keys;
-        return this->query_nodes_impl(id, tag, keys0);
+        return this->query_nodes_impl(id, tag, keys);
     }
 
     // [[nodiscard]] std::optional<row> query_nodes(int64_t id, std::string_view tag, std::span<std::string> keys) {
@@ -116,8 +118,7 @@ public:
     }
 
     [[nodiscard]] std::optional<row> query_nodes(std::string_view id, std::string_view tag, std::initializer_list<std::string_view> keys) {
-        std::vector<std::string_view> keys0 = keys;
-        return this->query_nodes_impl(id, tag, keys0);
+        return this->query_nodes_impl(id, tag, keys);
     }
 
     // [[nodiscard]] std::optional<row> query_nodes(std::string_view id, std::string_view tag, std::span<std::string> keys) {
@@ -135,8 +136,7 @@ public:
     [[nodiscard]] std::optional<std::tuple<vector, table>> query_neighbors(int64_t id, std::string_view tag,
         std::initializer_list<std::string_view> keys, bool reversely = false)
     {
-        std::vector<std::string_view> keys0 = keys;
-        return this->query_neighbors_impl(id, tag, keys0, reversely);
+        return this->query_neighbors_impl(id, tag, keys, reversely);
     }
 
     // [[nodiscard]] std::optional<std::tuple<vector, table>> query_neighbors(int64_t id, std::string_view tag,
@@ -154,8 +154,7 @@ public:
     [[nodiscard]] std::optional<std::tuple<vector, table>> query_neighbors(std::string_view id, std::string_view tag,
         std::initializer_list<std::string_view> keys, bool reversely = false)
     {
-        std::vector<std::string_view> keys0 = keys;
-        return this->query_neighbors_impl(id, tag, keys0, reversely);
+        return this->query_neighbors_impl(id, tag, keys, reversely);
     }
 
     // [[nodiscard]] std::optional<std::tuple<vector, table>> query_neighbors(std::string_view id, std::string_view tag,
@@ -171,8 +170,7 @@ public:
     }
 
     [[nodiscard]] std::optional<vector> query_kv(std::initializer_list<std::string_view> keys, value_param defa) {
-        std::vector<std::string_view> keys0 = keys;
-        return this->query_kv_impl(keys0, defa);
+        return this->query_kv_impl(keys, defa);
     }
 
     // [[nodiscard]] std::optional<vector> query_kv(std::span<std::string> keys, value_param defa) {
@@ -184,8 +182,7 @@ public:
     }
 
     void update_kv(std::initializer_list<std::string_view> keys, vector_param vals, merge_type ops) {
-        std::vector<std::string_view> keys0 = keys;
-        return this->update_kv_impl(keys0, vals, ops);
+        return this->update_kv_impl(keys, vals, ops);
     }
 
     // void update_kv(std::span<std::string> keys, vector_param vals, merge_type ops) {
