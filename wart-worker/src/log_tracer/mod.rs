@@ -1,7 +1,57 @@
+use std::collections::{BTreeMap, VecDeque};
+use std::sync::{Arc, Mutex};
+
 use tracing_subscriber::Layer;
 
-pub struct WasmTracer;
-pub struct PrintlnVisitor;
+#[derive(Debug)]
+pub struct JsonVisitor<'a>(&'a mut BTreeMap<String, serde_json::Value>);
+
+impl<'a> tracing::field::Visit for JsonVisitor<'a> {
+    fn record_f64(&mut self, field: &tracing::field::Field, value: f64) {
+        self.0.insert(field.name().into(), serde_json::json!(value));
+    }
+
+    fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
+        self.0.insert(field.name().into(), serde_json::json!(value));
+    }
+
+    fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+        self.0.insert(field.name().into(), serde_json::json!(value));
+    }
+
+    fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
+        self.0.insert(field.name().into(), serde_json::json!(value));
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        self.0.insert(field.name().into(), serde_json::json!(value));
+    }
+
+    fn record_error(
+        &mut self,
+        field: &tracing::field::Field,
+        value: &(dyn std::error::Error + 'static),
+    ) {
+        self.0
+            .insert(field.name().into(), serde_json::json!(value.to_string()));
+    }
+
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        self.0.insert(
+            field.name().into(),
+            serde_json::json!(format!("{:?}", value)),
+        );
+    }
+}
+
+#[derive(Default)]
+pub struct WasmTracer(Arc<Mutex<VecDeque<serde_json::Value>>>);
+
+impl WasmTracer {
+    pub fn get_logs(&self) -> Arc<Mutex<VecDeque<serde_json::Value>>> {
+        self.0.clone()
+    }
+}
 
 impl<S> Layer<S> for WasmTracer
 where
@@ -13,61 +63,25 @@ where
         event: &tracing::Event<'_>,
         _ctx: tracing_subscriber::layer::Context<'_, S>,
     ) {
-        // println!("got event:");
-        // println!("  level = {:?}", event.metadata().level());
-        // println!("  target = {:?}", event.metadata().target());
-        // println!("  name = {:?}", event.metadata().name());
-        // let mut visitor = PrintlnVisitor;
-        // event.record(&mut visitor);
-    }
+        let mut fields = Default::default();
+        let mut visitor = JsonVisitor(&mut fields);
+        event.record(&mut visitor);
 
-    // fn on_new_span(
-    //     &self,
-    //     attrs: &tracing::span::Attributes<'_>,
-    //     id: &tracing::span::Id,
-    //     ctx: tracing_subscriber::layer::Context<'_, S>,
-    // ) {
-    //     let span = ctx.span(id).unwrap();
-    //     println!("Got on_new_span!");
-    //     println!("  level={:?}", span.metadata().level());
-    //     println!("  target={:?}", span.metadata().target());
-    //     println!("  name={:?}", span.metadata().name());
+        fields.remove("log.file");
+        fields.remove("log.line");
+        fields.remove("log.module_path");
+        let target = fields
+            .remove("log.target")
+            .unwrap_or_else(|| serde_json::json!(event.metadata().target()));
 
-    //     let mut visitor = PrintlnVisitor;
-    //     attrs.record(&mut visitor);
-    // }
-}
+        let output = serde_json::json!({
+            "target": target,
+            "level": event.metadata().level().to_string(),
+            "fields": fields,
+        });
 
-impl tracing::field::Visit for PrintlnVisitor {
-    fn record_f64(&mut self, field: &tracing::field::Field, value: f64) {
-        println!("  field={} value={}", field.name(), value)
-    }
-
-    fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        println!("  field={} value={}", field.name(), value)
-    }
-
-    fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
-        println!("  field={} value={}", field.name(), value)
-    }
-
-    fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        println!("  field={} value={}", field.name(), value)
-    }
-
-    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        println!("  field={} value={}", field.name(), value)
-    }
-
-    fn record_error(
-        &mut self,
-        field: &tracing::field::Field,
-        value: &(dyn std::error::Error + 'static),
-    ) {
-        println!("  field={} value={}", field.name(), value)
-    }
-
-    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
-        println!("  field={} value={:?}", field.name(), value)
+        if let Ok(mut it) = self.0.lock() {
+            it.push_back(output);
+        }
     }
 }

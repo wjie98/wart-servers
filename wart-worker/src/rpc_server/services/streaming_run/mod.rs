@@ -73,27 +73,33 @@ async fn streaming_run_args(
                 use tracing_futures::WithSubscriber;
                 use tracing_subscriber::fmt::Subscriber;
 
+                let tracer = WasmTracer::default();
+                let logs = tracer.get_logs();
+
                 let subscriber = Subscriber::builder()
                     .with_max_level(Subscriber::DEFAULT_MAX_LEVEL)
                     // .with_max_level(tracing::level_filters::LevelFilter::TRACE)
                     .finish()
-                    .with(WasmTracer);
+                    .with(tracer);
 
                 let task = streaming_run_sandbox(request, storage_manager.clone())
                     .with_subscriber(subscriber);
 
-                let tout =
-                    time::timeout(time::Duration::from_millis(storage_manager.ttl), task);
-                
+                let tout = time::timeout(time::Duration::from_millis(storage_manager.ttl), task);
+
                 tokio::select! {
                     out = tout => {
                         match out {
                             Ok(res) => match res {
                                 Ok(tables) => {
-                                    let resp = StreamingRunResponse {
-                                        tables,
-                                        logs: vec![],
+                                    let logs = if let Ok(it) = logs.lock() {
+                                        it.iter()
+                                            .filter_map(|x| serde_json::to_string(x).ok())
+                                            .collect::<Vec<_>>()
+                                    } else {
+                                        vec![]
                                     };
+                                    let resp = StreamingRunResponse { tables, logs };
                                     if let Err(_) = mpsc_tx.send(Ok(resp)).await {
                                         break;
                                     }
@@ -109,7 +115,7 @@ async fn streaming_run_args(
                         }
                     },
                     _ = mpsc_tx.closed() => {
-                        break;    
+                        break;
                     }
                 };
             }

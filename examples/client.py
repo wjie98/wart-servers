@@ -91,12 +91,14 @@ def run():
         #     assert resp.ok_count > 0
         
         # 运行采样脚本
-        args = [["12345"], []] # 运行两次，可以设置命令行参数也可以不设置
+        args = [["12345"],] + [[]] * 100 # 可以设置命令行参数也可以不设置
         for resp in stub.StreamingRun(streaming_run_iter(token, args)):
             for t in resp.tables:
                 name, table = to_pd(t)
                 print("name:", name)
                 print(table)
+            for s in resp.logs: # 打印日志
+                print(s)
             print("==================================")
         
         # 关闭采样session

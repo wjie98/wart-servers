@@ -107,6 +107,6 @@ int main(int argc, char* argv[]) {
     // test_choice_nodes(store);
     test_query_nodes(store);
     test_query_neighbors(store);
-    // test_log();
+    test_log();
     return 0;
 }
