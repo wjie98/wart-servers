@@ -1,5 +1,6 @@
 mod backend;
 mod bindgen;
+mod log_tracer;
 mod rpc_server;
 mod wasm;
 
@@ -84,10 +85,6 @@ lazy_static! {
         }
     };
 }
-
-struct CustomLayer;
-
-impl<S> tracing_subscriber::Layer<S> for CustomLayer where S: tracing::Subscriber {}
 
 #[tokio::main]
 async fn main() -> Result<(), tonic::transport::Error> {

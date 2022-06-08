@@ -2228,6 +2228,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tracing",
+ "tracing-futures",
  "tracing-subscriber",
  "uuid",
  "wasmtime",

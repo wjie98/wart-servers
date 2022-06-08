@@ -4,9 +4,11 @@
 #include <span>
 #include <string>
 #include <vector>
-#include <optional>
 
 #include <imports.h>
+#include <utils.hpp>
+#include <conv.hpp>
+#include <option.hpp>
 
 namespace imports {
 
@@ -33,26 +35,38 @@ public:
     bool is_f64() const { return this->type() == value_type::f64; }
     bool is_txt() const { return this->type() == value_type::txt; }
 
-    bool as_bol() const { return this->_data.val.bol; }
-    int32_t as_i32() const { return this->_data.val.i32; }
-    int64_t as_i64() const { return this->_data.val.i64; }
-    float as_f32() const { return this->_data.val.f32; }
-    double as_f64() const { return this->_data.val.f64; }
+    imports::bol as_bol() const {
+        if (!this->is_bol()) LOG_ABORT("value_type is not 'bol'")
+        return this->_data.val.bol;
+    }
+    imports::i32 as_i32() const {
+        if (!this->is_i32()) LOG_ABORT("value_type is not 'i32'")
+        return this->_data.val.i32;
+    }
+    imports::i64 as_i64() const {
+        if (!this->is_i64()) LOG_ABORT("value_type is not 'i64'")
+        return this->_data.val.i64;
+    }
+    imports::f32 as_f32() const {
+        if (!this->is_f32()) LOG_ABORT("value_type is not 'f32'")
+        return this->_data.val.f32;
+    }
+    imports::f64 as_f64() const {
+        if (!this->is_f64()) LOG_ABORT("value_type is not 'f64'")
+        return this->_data.val.f64;
+    }
     std::string_view as_txt() const {
+        if (!this->is_txt()) LOG_ABORT("value_type is not 'txt'")
         auto& txt = this->_data.val.txt;
         return {txt.ptr, txt.len};
     }
-};
 
-class item_view {
-    imports_item_t _data;
-public:
-    item_view(const imports_item_t* data) { this->_data = *data; }
-    std::string_view key() const {
-        auto& key = this->_data.key;
-        return {key.ptr, key.len};
-    }
-    value_view val() const { return &this->_data.val; }
+    imports::bol to_bol() const { return to_type<imports::bol>(this->_data); }
+    imports::i32 to_i32() const { return to_type<imports::i32>(this->_data); }
+    imports::i64 to_i64() const { return to_type<imports::i64>(this->_data); }
+    imports::f32 to_f32() const { return to_type<imports::f32>(this->_data); }
+    imports::f64 to_f64() const { return to_type<imports::f64>(this->_data); }
+    std::string  to_txt() const { return to_type<std::string> (this->_data); }
 };
 
 class vector_view {
@@ -100,26 +114,32 @@ public:
     bool empty() const { return this->size() == 0; }
     
     std::span<bool> as_bol() const {
+        if (!this->is_bol()) LOG_ABORT("vector_type is not 'bol'")
         auto& bol = this->_data.val.bol;
         return {bol.ptr, bol.len};
     }
     std::span<int32_t> as_i32() const {
+        if (!this->is_i32()) LOG_ABORT("vector_type is not 'i32'")
         auto& i32 = this->_data.val.i32;
         return {i32.ptr, i32.len};
     }
     std::span<int64_t> as_i64() const {
+        if (!this->is_i64()) LOG_ABORT("vector_type is not 'i64'")
         auto& i64 = this->_data.val.i64;
         return {i64.ptr, i64.len};
     }
     std::span<float> as_f32() const {
+        if (!this->is_f32()) LOG_ABORT("vector_type is not 'f32'")
         auto& f32 = this->_data.val.f32;
         return {f32.ptr, f32.len};
     }
     std::span<double> as_f64() const {
+        if (!this->is_f64()) LOG_ABORT("vector_type is not 'f64'")
         auto& f64 = this->_data.val.f64;
         return {f64.ptr, f64.len};
     }
     std::vector<std::string_view> as_txt() const {
+        if (!this->is_txt()) LOG_ABORT("vector_type is not 'txt'")
         auto& txt = this->_data.val.txt;
         
         std::vector<std::string_view> view;
@@ -131,12 +151,29 @@ public:
         return view;
     }
     std::string_view view_string(size_t i) const {
+        if (!this->is_txt()) LOG_ABORT("vector_type is not 'txt'")
         auto& txt = this->_data.val.txt;
         auto& str = std::span<imports_string_t>(txt.ptr, txt.len)[i];
         return {str.ptr, str.len};
     }
+    std::vector<imports::bol> to_bol() const { return to_type<imports::bol>(this->_data); }
+    std::vector<imports::i32> to_i32() const { return to_type<imports::i32>(this->_data); }
+    std::vector<imports::i64> to_i64() const { return to_type<imports::i64>(this->_data); }
+    std::vector<imports::f32> to_f32() const { return to_type<imports::f32>(this->_data); }
+    std::vector<imports::f64> to_f64() const { return to_type<imports::f64>(this->_data); }
+    std::vector<std::string>  to_txt() const { return to_type<std::string> (this->_data); }
 };
 
+class item_view {
+    imports_item_t _data;
+public:
+    item_view(const imports_item_t* data) { this->_data = *data; }
+    std::string_view key() const {
+        auto& key = this->_data.key;
+        return {key.ptr, key.len};
+    }
+    value_view val() const { return &this->_data.val; }
+};
 class series_view {
     imports_series_t _data;
 public:
@@ -150,22 +187,6 @@ public:
     bool empty() const { return this->val().empty(); }
 };
 
-inline bool __lt_imports_item(const imports_item_t& x, const imports_item_t& y) {
-    return std::string_view(x.key.ptr, x.key.len) < std::string_view(y.key.ptr, y.key.len);
-}
-
-inline bool __eq_imports_item(const imports_item_t& x, const imports_item_t& y) {
-    return std::string_view(x.key.ptr, x.key.len) == std::string_view(y.key.ptr, y.key.len);
-}
-
-inline bool __lt_imports_series(const imports_series_t& x, const imports_series_t& y) {
-    return std::string_view(x.key.ptr, x.key.len) < std::string_view(y.key.ptr, y.key.len);
-}
-
-inline bool __eq_imports_series(const imports_series_t& x, const imports_series_t& y) {
-    return std::string_view(x.key.ptr, x.key.len) == std::string_view(y.key.ptr, y.key.len);
-}
-
 class row_view {
     imports_row_t _data;
 public:
@@ -175,7 +196,7 @@ public:
     item_view operator[] (size_t i) const {
         return &std::span<imports_item_t>(this->_data.ptr, this->_data.len)[i];
     }
-    std::optional<value_view> operator[] (std::string_view key) const {
+    option<value_view> operator[] (std::string_view key) const {
         std::span<imports_item_t> span0 = {this->_data.ptr, this->_data.len};
         imports_item_t item0 = {
             .key = {
@@ -187,9 +208,9 @@ public:
         auto it = std::lower_bound(span0.begin(), span0.end(), item0, __lt_imports_item);
 
         if (it != span0.end() && __eq_imports_item(*it, item0)) {
-            return &it->val;
+            return option<value_view>::some(&it->val);
         }
-        return nullptr;
+        return option<value_view>::none();
     }
 };
 
@@ -202,7 +223,7 @@ public:
     series_view operator[] (size_t i) const {
         return &std::span<imports_series_t>(this->_data.ptr, this->_data.len)[i];
     }
-    std::optional<vector_view> operator[] (std::string_view key) const {
+    option<vector_view> operator[] (std::string_view key) const {
         std::span<imports_series_t> span0 = {this->_data.ptr, this->_data.len};
         imports_series_t series0 = {
             .key = {
@@ -214,9 +235,9 @@ public:
         auto it = std::lower_bound(span0.begin(), span0.end(), series0, __lt_imports_series);
 
         if (it != span0.end() && __eq_imports_series(*it, series0)) {
-            return &it->val;
+            return option<vector_view>::some(&it->val);
         }
-        return nullptr;
+        return option<vector_view>::none();
     }
 };
 

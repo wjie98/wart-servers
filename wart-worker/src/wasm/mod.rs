@@ -283,7 +283,7 @@ impl imports::Imports for Storage {
             .get()
             .await
             .map_err(|err| {
-                log::error!("connection pool error: {}", err);
+                log::error!("connection pool: {}", err);
                 err
             })
             .ok()?

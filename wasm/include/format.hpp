@@ -497,7 +497,7 @@ constexpr std::size_t as_size_t(std::size_t begin, std::size_t end)
         if (!is_digit(pattern[begin]))
         {
             // throw std::invalid_argument("Invalid integer");
-            imports::log_abort("Invalid integer");
+            LOG_ABORT("Invalid integer")
         }
         
         res = res * 10 + pattern[begin] - '0';
@@ -635,7 +635,7 @@ constexpr Spec as_spec()
     else
     {
         // throw std::invalid_argument("Invalid format spec");
-        imports::log_abort("Invalid format spec");
+        LOG_ABORT("Invalid format spec")
     }
 }
 

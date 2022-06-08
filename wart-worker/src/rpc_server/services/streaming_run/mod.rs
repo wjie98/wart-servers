@@ -10,6 +10,8 @@ use tokio::time;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
+use tracing_subscriber::prelude::*;
+
 use crate::GLOBALS;
 
 type StreamingRunStream = ReceiverStream<Result<StreamingRunResponse, Status>>;
@@ -67,32 +69,49 @@ async fn streaming_run_args(
     while let Some(request) = istream.next().await {
         match request {
             Ok(request) => {
-                let ret = time::timeout(
-                    time::Duration::from_millis(storage_manager.ttl),
-                    streaming_run_sandbox(request, storage_manager.clone()),
-                )
-                .await;
+                use crate::log_tracer::WasmTracer;
+                use tracing_futures::WithSubscriber;
+                use tracing_subscriber::fmt::Subscriber;
 
-                match ret {
-                    Ok(result) => match result {
-                        Ok(tables) => {
-                            let resp = StreamingRunResponse {
-                                tables,
-                                logs: vec![],
-                            };
-                            if let Err(_) = mpsc_tx.send(Ok(resp)).await {
+                let subscriber = Subscriber::builder()
+                    .with_max_level(Subscriber::DEFAULT_MAX_LEVEL)
+                    // .with_max_level(tracing::level_filters::LevelFilter::TRACE)
+                    .finish()
+                    .with(WasmTracer);
+
+                let task = streaming_run_sandbox(request, storage_manager.clone())
+                    .with_subscriber(subscriber);
+
+                let tout =
+                    time::timeout(time::Duration::from_millis(storage_manager.ttl), task);
+                
+                tokio::select! {
+                    out = tout => {
+                        match out {
+                            Ok(res) => match res {
+                                Ok(tables) => {
+                                    let resp = StreamingRunResponse {
+                                        tables,
+                                        logs: vec![],
+                                    };
+                                    if let Err(_) = mpsc_tx.send(Ok(resp)).await {
+                                        break;
+                                    }
+                                }
+                                Err(err) => {
+                                    log::error!("streaming_run_sandbox: {}", err);
+                                }
+                            },
+                            Err(err) => {
+                                let _ = mpsc_tx.send(Err(Status::cancelled(err.to_string()))).await;
                                 break;
                             }
                         }
-                        Err(err) => {
-                            log::error!("streaming_run_sandbox: {}", err);
-                        }
                     },
-                    Err(err) => {
-                        let _ = mpsc_tx.send(Err(Status::cancelled(err.to_string()))).await;
-                        break;
+                    _ = mpsc_tx.closed() => {
+                        break;    
                     }
-                }
+                };
             }
             Err(err) => {
                 let _ = mpsc_tx.send(Err(err)).await;
@@ -119,8 +138,8 @@ async fn streaming_run_sandbox(
                     let tables = sandbox.store.into_data().imports.into_tables().await;
                     tables
                 }
-                Err(err) => {
-                    log::error!("streaming_run_sandbox: {}", err);
+                Err(_) => {
+                    // log::error!("streaming_run_sandbox: {}", err);
                     vec![]
                 }
             };

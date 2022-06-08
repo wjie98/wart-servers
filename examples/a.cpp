@@ -15,58 +15,59 @@ void test_choice_nodes(imports::storage& store) {
     // 定义一张表，采样结束后返回到客户端
     // default_values用于设定表里包含的列，列的类型和默认值
     auto table = imports::data_frame::open("choice_nodes", {
-        {"node_id", "none"},
+        {"node_id", -1LL},
         {"dummy", false},
-    });
+    }).unwrap();
 
     // 随机选择3个节点
-    auto r = *store.choice_nodes("player", 3);  // 返回的是optional值，需要解引用
+    auto r = store.choice_nodes("author", 3).expect("choice_nodes() returned 'None'");
 
     // 获取节点内容
-    auto n = r.view().size();   // r.view() 获得数据查看器，数据所有权依然和变量r绑定，支持移动语义
-    for (size_t i = 0; i < n; i++) {
-        table->push({
-            {"node_id", r.view().view_string(i)},
+    auto vs = r.view().as_i64(); // 这里做了类型转换
+    for (auto it = vs.begin(); it != vs.end(); ++it) {
+        table.push({
+            {"node_id", *it},
         });
     }
 }
 
 void test_query_nodes(imports::storage& store) {
     // age 是int64_t类型
-    auto table = imports::data_frame::open("query_nodes(player102)", {
-        { "name", ""},
-        { "age", -1LL },
-    });
+    auto table = imports::data_frame::open("query_nodes(1005)", {
+        { "author_id", -1},
+        { "label", -1},
+    }).unwrap();
 
-    // 目前返回的table的headers会附带tag作为前缀
-    auto r = *store.query_nodes("player102", "player", {"name", "age"});
+    auto r = store.query_nodes(1005, "author", {"author_id", "label"}).unwrap();
 
-    auto name = r.view()["player.name"]->as_txt();
-    auto age = r.view()["player.age"]->as_i64();
-    table->push({
-        {"name", name},
-        {"age", age},
+    assert(r.view()["author.author_id"].unwrap().is_i64()); // 实际类型都为i64
+    assert(r.view()["author.label"].expect("no author.label").is_i64()); // 使用expect解包以获得更明确的错误信息
+
+    auto author_id = r.view()["author.author_id"].unwrap().to_i32(); // 强制转成i32
+    auto label = r.view()["author.label"].unwrap().to_i32();
+    table.push({
+        {"author_id", author_id},
+        {"label", label},
     });
 }
 
 void test_query_neighbors(imports::storage& store) {
-    // 可以用一个span或者vector存储列表参数
-    imports::item_param default_values[] = {
-        {"target", "none"},
-        {"start_year", -1LL},
-    };
-    auto table = imports::data_frame::open("test_query_neighbors(player101)", default_values);
+    auto table = imports::data_frame::open("test_query_neighbors(1005)", {
+        {"target", -1LL},
+        {"time_stamp", -1LL},
+    }).unwrap();
 
-    std::string_view keys[] = {"start_year"};
-    auto [dst, attr] = *store.query_neighbors("player101", "serve", keys);  // 这里用了c++17的结构化绑定
+    auto [dst, attr] = store.query_neighbors(1005, "coauthor", {"time_stamp"}).unwrap();
+
+    assert(attr.view()["coauthor.time_stamp"].unwrap().is_i64()); // 实际类型为i64
 
     auto n = dst.view().size();
     for (size_t i = 0; i < n; i++) {
         imports::item_param data[] = {
-            {"target", dst.view().as_txt()[i]},
-            {"start_year", attr.view()["serve.start_year"]->as_i64()[i]},
+            {"target", dst.view().as_i64()[i]},
+            {"time_stamp", attr.view()["coauthor.time_stamp"].unwrap().as_i64()[i]}, // 这里不发生强制类型转换
         };
-        table->push(data);
+        table.push(data);
     }
 }
 
@@ -90,12 +91,22 @@ void test_log() {
     imports::format<"{}">("ABC"); // fmt::format()
 }
 
-int main() {
+int main(int argc, char* argv[]) {
 
-    auto store = *imports::storage::open();
-    test_choice_nodes(store);
+    if (argc != 0) {
+        // 获得整数类型的参数
+        auto a = imports::txt2i32(argv[0]);
+        imports::log_info<"args: {}">(a);
+
+        // 如果需要在模板函数里使用，可以这样写
+        auto b = imports::__from_txt<imports::i32>(argv[0]);
+        imports::log_info<"args: {}">(b);
+    }
+
+    auto store = imports::storage::open().unwrap();
+    // test_choice_nodes(store);
     test_query_nodes(store);
     test_query_neighbors(store);
-    test_log();
+    // test_log();
     return 0;
 }

@@ -1,4 +1,4 @@
-rpc_server: "[::1]:6066"
+rpc_server: "[::1]:6067"
 
 redis_server: "127.0.0.1:20202"
 

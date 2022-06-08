@@ -69,13 +69,13 @@ def run():
         program = f.read()
     
     # 连接采样服务器
-    with grpc.insecure_channel("[::1]:6066") as channel:
+    with grpc.insecure_channel("[::1]:6067") as channel:
         # 创建采样客户端
         stub = WartWorkerStub(channel)
         
         # 启动采样session，设置图空间名称，上传采样脚本
         resp = stub.OpenSession(OpenSessionRequest(
-            space_name = "nebula:basketballplayer",
+            space_name = "nebula:DBLPV13",
             program = program,
             io_timeout = 1000, # 单次IO限时(废弃)
             ex_timeout = 2000, # 单次采样限时
@@ -91,7 +91,7 @@ def run():
         #     assert resp.ok_count > 0
         
         # 运行采样脚本
-        args = [["arg1"], []] # 运行两次，可以设置命令行参数也可以不设置
+        args = [["12345"], []] # 运行两次，可以设置命令行参数也可以不设置
         for resp in stub.StreamingRun(streaming_run_iter(token, args)):
             for t in resp.tables:
                 name, table = to_pd(t)
