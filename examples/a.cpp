@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
     }
 
     auto store = imports::storage::open().unwrap();
-    // test_choice_nodes(store);
+    test_choice_nodes(store);
     test_query_nodes(store);
     test_query_neighbors(store);
     test_log();
