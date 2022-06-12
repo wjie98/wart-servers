@@ -77,13 +77,13 @@ def run():
         resp = stub.OpenSession(OpenSessionRequest(
             space_name = "nebula:DBLPV13",
             program = program,
-            io_timeout = 1000, # 单次IO限时(废弃)
+            # io_timeout = 1000, # 单次IO限时(废弃)
             ex_timeout = 2000, # 单次采样限时
+            parallel = 32, # 并行执行
         ))
         
-        # 获得session的token
         token = resp.ok.token
-        print("token: ", token)
+        print(f"Opened: {token}")
         
         # # 更新session全局状态
         # pairs = {"a": 1, "b": 1, "c": 1}
@@ -92,19 +92,22 @@ def run():
         
         # 运行采样脚本
         args = [["12345"],] + [[]] * 100 # 可以设置命令行参数也可以不设置
-        for resp in stub.StreamingRun(streaming_run_iter(token, args)):
+        for i, resp in enumerate(stub.StreamingRun(streaming_run_iter(token, args))):
             for t in resp.tables:
                 name, table = to_pd(t)
                 print("name:", name)
                 print(table)
             for s in resp.logs: # 打印日志
                 print(s)
-            print("==================================")
-        
+            print(f"================{i}================")
+            if i == len(args) - 1:
+                break
+            
         # 关闭采样session
         stub.CloseSession(CloseSessionRequest(
             token = token,
         ))
+        print(f"Closed: {token}")
 
 if __name__ == "__main__":
     run()

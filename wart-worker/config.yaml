@@ -3,3 +3,5 @@ rpc_server: "[::1]:6067"
 redis_server: "127.0.0.1:20202"
 
 storage_server: "[::1]:9806"
+
+cores: 32

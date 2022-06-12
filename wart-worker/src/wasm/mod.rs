@@ -31,6 +31,7 @@ pub struct StorageManager {
     pub epoch: u64,
     pub token: String,
     pub ttl: u64,
+    pub par: usize,
     vmm: SandboxManager<Storage>,
 }
 
@@ -40,14 +41,16 @@ impl StorageManager {
 
         let key = format!("wart:session:{}", token);
 
-        let (space_name, epoch, ttl, module): (String, u64, u64, Vec<u8>) = redis::pipe()
-            .atomic()
-            .hget(&key, "space_name")
-            .hget(&key, "epoch")
-            .hget(&key, "ex_timeout")
-            .hget(&key, "module")
-            .query_async(&mut *con)
-            .await?;
+        let (space_name, epoch, ttl, module, par): (String, u64, u64, Vec<u8>, usize) =
+            redis::pipe()
+                .atomic()
+                .hget(&key, "space_name")
+                .hget(&key, "epoch")
+                .hget(&key, "ex_timeout")
+                .hget(&key, "module")
+                .hget(&key, "parallel")
+                .query_async(&mut *con)
+                .await?;
 
         let config = SandboxManager::<Storage>::default_config();
         let vmm = SandboxManager::<Storage>::from_module(&module, &config)?;
@@ -57,6 +60,7 @@ impl StorageManager {
             epoch,
             token: token.into(),
             ttl,
+            par,
             vmm,
         })
     }

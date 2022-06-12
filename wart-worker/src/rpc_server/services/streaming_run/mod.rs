@@ -10,7 +10,11 @@ use tokio::time;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Streaming};
 
+use tracing_futures::WithSubscriber;
+use tracing_subscriber::fmt::Subscriber;
 use tracing_subscriber::prelude::*;
+
+use crate::log_tracer::WasmTracer;
 
 use crate::GLOBALS;
 
@@ -33,7 +37,28 @@ async fn streaming_run_impl(
     if let Some(config) = istream.next().await {
         let config = config?;
         let storage_manager = streaming_run_config(config).await?;
-        tokio::spawn(streaming_run_args(istream, mpsc_tx, storage_manager));
+
+        let engine = storage_manager.get_engine();
+        let clk_tx = mpsc_tx.clone();
+        tokio::spawn(async move {
+            let duration = time::Duration::from_millis(100);
+            let mut interval = time::interval(duration);
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        engine.increment_epoch();
+                    },
+                    _ = clk_tx.closed() => {
+                        break
+                    },
+                }
+            }
+            log::info!("clk aborted");
+        });
+
+        GLOBALS
+            .runtime
+            .spawn(streaming_run_args(istream, mpsc_tx, storage_manager));
     }
 
     Ok(ReceiverStream::new(mpsc_rx))
@@ -56,101 +81,107 @@ async fn streaming_run_args(
     mpsc_tx: mpsc::Sender<Result<StreamingRunResponse, Status>>,
     storage_manager: StorageManager,
 ) {
-    let engine = storage_manager.get_engine();
-    let clk_handle = GLOBALS.epoch_interrupter.spawn(async move {
-        let duration = time::Duration::from_millis(100);
-        let mut interval = time::interval(duration);
-        loop {
-            interval.tick().await;
-            engine.increment_epoch();
+    let (par_tx, mut par_rx) = mpsc::channel(storage_manager.par);
+    let bypass_tx = mpsc_tx.clone();
+    tokio::spawn(async move {
+        while let Some(request) = istream.next().await {
+            let request = match request {
+                Ok(request) => request,
+                Err(err) => {
+                    let _ = bypass_tx.send(Err(err)).await;
+                    break;
+                }
+            };
+
+            tokio::select! {
+                p = par_tx.reserve() => match p {
+                    Ok(permit) => {
+                        let task = tokio::spawn(streaming_run_launch(
+                            request,
+                            bypass_tx.clone(),
+                            storage_manager.clone(),
+                        ));
+                        permit.send(task);
+                    },
+                    Err(err) => {
+                        log::error!("{}", err);
+                        break;
+                    }
+                },
+                _ = bypass_tx.closed() => {
+                    break;
+                },
+            }
         }
     });
 
-    while let Some(request) = istream.next().await {
-        match request {
-            Ok(request) => {
-                use crate::log_tracer::WasmTracer;
-                use tracing_futures::WithSubscriber;
-                use tracing_subscriber::fmt::Subscriber;
-
-                let tracer = WasmTracer::default();
-                let logs = tracer.get_logs();
-
-                let subscriber = Subscriber::builder()
-                    .with_max_level(Subscriber::DEFAULT_MAX_LEVEL)
-                    // .with_max_level(tracing::level_filters::LevelFilter::TRACE)
-                    .finish()
-                    .with(tracer);
-
-                let task = streaming_run_sandbox(request, storage_manager.clone())
-                    .with_subscriber(subscriber);
-
-                let tout = time::timeout(time::Duration::from_millis(storage_manager.ttl), task);
-
-                tokio::select! {
-                    out = tout => {
-                        match out {
-                            Ok(res) => match res {
-                                Ok(tables) => {
-                                    let logs = if let Ok(it) = logs.lock() {
-                                        it.iter()
-                                            .filter_map(|x| serde_json::to_string(x).ok())
-                                            .collect::<Vec<_>>()
-                                    } else {
-                                        vec![]
-                                    };
-                                    let resp = StreamingRunResponse { tables, logs };
-                                    if let Err(_) = mpsc_tx.send(Ok(resp)).await {
-                                        break;
-                                    }
-                                }
-                                Err(err) => {
-                                    log::error!("streaming_run_sandbox: {}", err);
-                                }
-                            },
-                            Err(err) => {
-                                let _ = mpsc_tx.send(Err(Status::cancelled(err.to_string()))).await;
-                                break;
-                            }
-                        }
-                    },
-                    _ = mpsc_tx.closed() => {
+    while let Some(task) = par_rx.recv().await {
+        match task.await {
+            Ok(result) => match result {
+                Ok(resp) => {
+                    if let Err(_) = mpsc_tx.send(Ok(resp)).await {
                         break;
                     }
-                };
-            }
+                }
+                Err(err) => {
+                    log::error!("{}", err);
+                    if let Err(_) = mpsc_tx.send(Ok(StreamingRunResponse::default())).await {
+                        break;
+                    }
+                }
+            },
             Err(err) => {
-                let _ = mpsc_tx.send(Err(err)).await;
+                log::error!("{}", err);
                 break;
             }
         }
     }
-
-    clk_handle.abort();
 }
 
-async fn streaming_run_sandbox(
+async fn streaming_run_launch(
     request: StreamingRunRequest,
+    bypass_tx: mpsc::Sender<Result<StreamingRunResponse, Status>>,
     storage_manager: StorageManager,
-) -> Result<Vec<DataFrame>> {
-    match request.data.ok_or(anyhow!("empty args"))? {
-        streaming_run_request::Data::Args(args) => {
-            let args = args.args;
-            let mut sandbox = storage_manager.get_sandbox(&args).await?;
+) -> Result<StreamingRunResponse> {
+    use streaming_run_request::Data::{Args, Config};
 
+    let request = request.data.ok_or(anyhow!("empty args"))?;
+    match request {
+        Config(_) => Err(anyhow!("invalid args"))?,
+        Args(args) => {
+            let args = &args.args;
+            let mut sandbox = storage_manager.get_sandbox(args).await?;
             sandbox.store.epoch_deadline_async_yield_and_update(1);
-            let tables = match sandbox.call_async().await {
-                Ok(_) => {
-                    let tables = sandbox.store.into_data().imports.into_tables().await;
-                    tables
+
+            let tracer = WasmTracer::default();
+            let logs = tracer.get_logs();
+            let subscriber = Subscriber::builder()
+                .with_max_level(Subscriber::DEFAULT_MAX_LEVEL)
+                .finish()
+                .with(tracer);
+
+            let ttl = time::Duration::from_millis(storage_manager.ttl);
+            let task = time::timeout(ttl, sandbox.call_async()).with_subscriber(subscriber);
+
+            tokio::select! {
+                result = task => {
+                    result??;
+                },
+                _ = bypass_tx.closed() => {
+                    Err(anyhow!("reset by peer"))?;
                 }
-                Err(_) => {
-                    // log::error!("streaming_run_sandbox: {}", err);
-                    vec![]
-                }
+            }
+
+            let tables = sandbox.store.into_data().imports.into_tables().await;
+            let logs = if let Ok(it) = logs.lock() {
+                it.iter()
+                    .filter_map(|x| serde_json::to_string(x).ok())
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
             };
-            Ok(tables)
+
+            Ok(StreamingRunResponse { tables, logs })
         }
-        _ => Err(anyhow!("invalid args"))?,
     }
 }

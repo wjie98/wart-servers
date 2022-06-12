@@ -16,6 +16,7 @@ pub async fn close_session_impl(request: CloseSessionRequest) -> Result<CloseSes
     let CloseSessionRequest { token } = request;
 
     let mut con = GLOBALS.redis.get().await?;
+    log::info!("closing session: {}", token);
 
     let key = format!("wart:session:{}", token);
     let (epoch,): (u64,) = redis::pipe()
@@ -37,6 +38,8 @@ pub async fn close_session_impl(request: CloseSessionRequest) -> Result<CloseSes
         .ignore()
         .query_async(&mut *con)
         .await?;
+
+    log::info!("session {} closed", token);
 
     Ok(CloseSessionResponse {})
 }

@@ -15,8 +15,9 @@ service WartWorker {
 message OpenSessionRequest {
     bytes program = 1;
     string space_name = 2;
-    uint32 io_timeout = 3;
+    // uint32 io_timeout = 3;
     uint32 ex_timeout = 4;
+    uint32 parallel = 5;
 }
 
 message OpenSessionResponse {

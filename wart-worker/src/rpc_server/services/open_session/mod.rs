@@ -17,8 +17,9 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
     let OpenSessionRequest {
         space_name,
         program,
-        io_timeout: _,
+        // io_timeout: _,
         ex_timeout,
+        parallel,
     } = request;
 
     let module = tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
@@ -31,6 +32,8 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
     let mut con = GLOBALS.redis.get().await?;
 
     let token = uuid::Uuid::new_v4().to_string();
+    log::info!("opening session: {}", token);
+
     let key = format!("wart:session:{}", token);
     let _: () = redis::pipe()
         .atomic()
@@ -44,6 +47,8 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
         .ignore()
         .hset(&key, "ex_timeout", ex_timeout)
         .ignore()
+        .hset(&key, "parallel", parallel)
+        .ignore()
         .query_async(&mut *con)
         .await?;
 
@@ -52,6 +57,8 @@ async fn open_session_impl(request: OpenSessionRequest) -> Result<OpenSessionRes
         .hget(&key, "token")
         .query_async(&mut *con)
         .await?;
+
+    log::info!("session {} closed", token);
 
     Ok(OpenSessionResponse {
         result: Some(open_session_response::Result::Ok(
