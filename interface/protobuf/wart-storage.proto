@@ -4,6 +4,8 @@ package wart_storage;
 
 import "wart-types.proto";
 
+option go_package = "./grpcserver";
+
 /*
 space_name: String = "nebula:${space_id}"
 tag: Tag or EdgeType
@@ -19,6 +21,15 @@ service WartStorage {
 
     //获取边的属性
     rpc FetchNeighbors(FetchNeighborsRequest) returns(StorageResponse);
+
+    //开始扫描边
+    rpc StartScanEdges(StartScanEdgesRequest) returns(ManagementResponse);
+
+    //获取一批边
+    rpc GetNextEdges(GetNextEdgesRequest) returns(StorageResponse);
+
+    //结束扫描边
+    rpc FinishScanEdges(FinishScanEdgesRequest) returns(ManagementResponse);
 }
 
 
@@ -49,6 +60,27 @@ message FetchNeighborsRequest{
     bool reversely = 6;
 }
 
+message StartScanEdgesRequest{
+    string space_name =1;
+    string tag=2;
+    string time_field=3;
+    int64 start_time=4;
+    int64 duration=5;
+}
+
+message GetNextEdgesRequest{
+    string iterator_token=1;
+    int64 number=2;
+}
+
+message FinishScanEdgesRequest{
+    string iterator_token=1;
+}
+
+message ManagementResponse{
+    string iterator_token=1;
+}
+
 message StorageResponse {
     string space_name = 1;
     string comment = 2;
@@ -57,3 +89,8 @@ message StorageResponse {
     string error_msg = 5;
     wart_types.DataFrame data = 6;
 }
+
+
+
+
+

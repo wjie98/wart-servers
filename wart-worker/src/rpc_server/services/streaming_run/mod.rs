@@ -38,22 +38,9 @@ async fn streaming_run_impl(
         let config = config?;
         let storage_manager = streaming_run_config(config).await?;
 
-        let engine = storage_manager.get_engine();
-        let clk_tx = mpsc_tx.clone();
-        tokio::spawn(async move {
-            let duration = time::Duration::from_millis(100);
-            let mut interval = time::interval(duration);
-            loop {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        engine.increment_epoch();
-                    },
-                    _ = clk_tx.closed() => {
-                        break
-                    },
-                }
-            }
-            log::info!("clk aborted");
+        let sig_cls = mpsc_tx.clone();
+        storage_manager.spawn_clk(async move {
+            sig_cls.closed().await;
         });
 
         GLOBALS
@@ -81,7 +68,12 @@ async fn streaming_run_args(
     mpsc_tx: mpsc::Sender<Result<StreamingRunResponse, Status>>,
     storage_manager: StorageManager,
 ) {
-    let (par_tx, mut par_rx) = mpsc::channel(storage_manager.par);
+    let par_n = if storage_manager.par > 0 {
+        storage_manager.par
+    } else {
+        1
+    };
+    let (par_tx, mut par_rx) = mpsc::channel(par_n);
     let bypass_tx = mpsc_tx.clone();
     tokio::spawn(async move {
         while let Some(request) = istream.next().await {
@@ -125,7 +117,11 @@ async fn streaming_run_args(
                 }
                 Err(err) => {
                     log::error!("{}", err);
-                    if let Err(_) = mpsc_tx.send(Ok(StreamingRunResponse::default())).await {
+                    let resp = StreamingRunResponse {
+                        last_err: err.to_string(),
+                        ..Default::default()
+                    };
+                    if let Err(_) = mpsc_tx.send(Ok(resp)).await {
                         break;
                     }
                 }
@@ -160,19 +156,26 @@ async fn streaming_run_launch(
                 .finish()
                 .with(tracer);
 
-            let ttl = time::Duration::from_millis(storage_manager.ttl);
-            let task = time::timeout(ttl, sandbox.call_async()).with_subscriber(subscriber);
+            {
+                let ttl = time::Duration::from_millis(storage_manager.ttl);
+                let task = time::timeout(ttl, sandbox.call_async()).with_subscriber(subscriber);
+                tokio::pin!(task);
 
-            tokio::select! {
-                result = task => {
-                    result??;
-                },
-                _ = bypass_tx.closed() => {
-                    Err(anyhow!("reset by peer"))?;
-                }
+                tokio::select! {
+                    result = &mut task => {
+                        result??;
+                    },
+                    _ = bypass_tx.closed() => {
+                        Err(anyhow!("reset by peer"))?;
+                    }
+                };
+                task.dispatch();
             }
 
-            let tables = sandbox.store.into_data().imports.into_tables().await;
+            let storage = sandbox.store.into_data().imports;
+            let time_used = (chrono::Local::now() - storage.start_time).num_milliseconds();
+
+            let tables = storage.into_tables().await;
             let logs = if let Ok(it) = logs.lock() {
                 it.iter()
                     .filter_map(|x| serde_json::to_string(x).ok())
@@ -181,7 +184,12 @@ async fn streaming_run_launch(
                 vec![]
             };
 
-            Ok(StreamingRunResponse { tables, logs })
+            Ok(StreamingRunResponse {
+                tables,
+                logs,
+                time_used,
+                ..Default::default()
+            })
         }
     }
 }

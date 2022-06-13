@@ -72,14 +72,6 @@ lazy_static! {
             .enable_all()
             .build()
             .unwrap();
-        // let epoch_interrupter = runtime.handle().clone();
-        // std::thread::spawn(move || {
-        //     runtime.block_on(async {
-        //         loop {
-        //             tokio::time::sleep(tokio::time::Duration::from_secs(1000)).await;
-        //         }
-        //     })
-        // });
 
         Globals {
             config,

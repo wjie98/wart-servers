@@ -60,6 +60,8 @@ message StreamingRunRequest {
 message StreamingRunResponse {
     repeated wart_types.DataFrame tables = 1;
     repeated string logs = 2;
+    string last_err = 3;
+    int64 time_used = 4;
 }
 
 message IncrementEpochRequest {

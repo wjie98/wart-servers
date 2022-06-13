@@ -1,6 +1,7 @@
 use crate::bindgen::*;
 
 mod sandbox;
+use futures::Future;
 pub use sandbox::{Sandbox, SandboxManager};
 
 use wasmtime::Engine;
@@ -14,15 +15,17 @@ use crate::GLOBALS;
 use anyhow::Result;
 use log;
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::collections::{BTreeMap, HashMap};
+use tokio::time;
 
 #[derive(Debug, Clone)]
 pub struct Storage {
     pub space_name: String,
     pub epoch: u64,
     pub token: String,
-    pub return_tables: Vec<(String, Arc<Mutex<HashMap<String, imports::VectorResult>>>)>,
+    pub return_tables: Vec<(String, BTreeMap<String, imports::VectorResult>)>,
+    pub start_time: chrono::DateTime<chrono::Local>,
+    pub statstic: BTreeMap<i64, u64>,
 }
 
 #[derive(Clone)]
@@ -67,17 +70,14 @@ impl StorageManager {
 
     pub async fn get_sandbox(&self, args: &[String]) -> Result<Sandbox<Storage>> {
         let wasi_ctx = WasiCtxBuilder::new().args(&args)?.build();
-        // let wasi_ctx = WasiCtxBuilder::new()
-        //     .inherit_stdout()
-        //     .inherit_stderr()
-        //     .args(&args)?
-        //     .build();
 
         let imports = Storage {
             space_name: self.space_name.clone(),
             epoch: self.epoch,
             token: self.token.clone(),
             return_tables: vec![],
+            start_time: chrono::Local::now(),
+            statstic: Default::default(),
         };
 
         self.vmm.instantiate(wasi_ctx, imports).await
@@ -86,57 +86,98 @@ impl StorageManager {
     pub fn get_engine(&self) -> Engine {
         self.vmm.engine.clone()
     }
+
+    pub fn spawn_clk<F>(&self, signal: F)
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let engine = self.get_engine();
+        let mut signal = Box::pin(signal);
+        tokio::spawn(async move {
+            let duration = time::Duration::from_millis(100);
+            let mut interval = time::interval(duration);
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        engine.increment_epoch();
+                    },
+                    _ = &mut signal => {
+                        break
+                    },
+                }
+            }
+            log::info!("clk aborted");
+        });
+    }
 }
 
 impl Storage {
     pub async fn into_tables(self) -> Vec<DataFrame> {
         let mut dfs = vec![];
         for (name, table) in self.return_tables.into_iter() {
-            match table.lock() {
-                Ok(mut table) => {
-                    let mut headers = vec![];
-                    let mut columns = vec![];
-                    for (k, v) in table.drain() {
-                        let values = match v {
-                            imports::VectorResult::Nil => continue,
-                            imports::VectorResult::Bol(x) => {
-                                series::Values::BoolValues(series::BoolSeries { data: x })
-                            }
-                            imports::VectorResult::I32(x) => {
-                                series::Values::Int32Values(series::Int32Series { data: x })
-                            }
-                            imports::VectorResult::I64(x) => {
-                                series::Values::Int64Values(series::Int64Series { data: x })
-                            }
-                            imports::VectorResult::F32(x) => {
-                                series::Values::Float32Values(series::Float32Series { data: x })
-                            }
-                            imports::VectorResult::F64(x) => {
-                                series::Values::Float64Values(series::Float64Series { data: x })
-                            }
-                            imports::VectorResult::Txt(x) => {
-                                series::Values::StringValues(series::StringSeries { data: x })
-                            }
-                        };
-
-                        headers.push(k);
-                        columns.push(Series {
-                            values: Some(values),
-                        });
+            let mut headers = vec![];
+            let mut columns = vec![];
+            for (k, v) in table.into_iter() {
+                let values = match v {
+                    imports::VectorResult::Nil => continue,
+                    imports::VectorResult::Bol(x) => {
+                        series::Values::BoolValues(series::BoolSeries { data: x })
                     }
+                    imports::VectorResult::I32(x) => {
+                        series::Values::Int32Values(series::Int32Series { data: x })
+                    }
+                    imports::VectorResult::I64(x) => {
+                        series::Values::Int64Values(series::Int64Series { data: x })
+                    }
+                    imports::VectorResult::F32(x) => {
+                        series::Values::Float32Values(series::Float32Series { data: x })
+                    }
+                    imports::VectorResult::F64(x) => {
+                        series::Values::Float64Values(series::Float64Series { data: x })
+                    }
+                    imports::VectorResult::Txt(x) => {
+                        series::Values::StringValues(series::StringSeries { data: x })
+                    }
+                };
 
-                    dfs.push(DataFrame {
-                        headers,
-                        columns,
-                        comment: name,
-                    });
-                }
-                Err(err) => {
-                    log::error!("return_tables: {}", err);
-                    return vec![];
-                }
-            };
+                headers.push(k);
+                columns.push(Series {
+                    values: Some(values),
+                });
+            }
+
+            dfs.push(DataFrame {
+                headers,
+                columns,
+                comment: name,
+            });
+
             tokio::task::yield_now().await;
+        }
+
+        {
+            let ts = self.statstic.keys().map(|v| *v).collect();
+            let ct = self.statstic.values().map(|v| *v as i64).collect();
+            let headers = vec!["timestamp".into(), "count".into()];
+            let columns = vec![
+                Series {
+                    values: Some(series::Values::Int64Values(series::Int64Series {
+                        data: ts,
+                    })),
+                },
+                Series {
+                    values: Some(series::Values::Int64Values(series::Int64Series {
+                        data: ct,
+                    })),
+                },
+            ];
+
+            dfs.push(DataFrame {
+                headers,
+                columns,
+                comment: "__statstic__".into(),
+            });
         }
         dfs
     }
@@ -144,7 +185,7 @@ impl Storage {
 
 #[derive(Debug)]
 pub struct ReturnTable {
-    data: Arc<Mutex<HashMap<String, imports::VectorResult>>>,
+    index: usize,
     defa: HashMap<String, imports::ValueResult>,
 }
 
@@ -193,12 +234,12 @@ impl imports::Imports for Storage {
                 let key = k.clone();
                 (key, val)
             })
-            .collect::<HashMap<_, _>>();
+            .collect::<BTreeMap<_, _>>();
 
-        let data = Arc::new(Mutex::new(data));
-        self.return_tables.push((name.into(), data.clone()));
+        let index = self.return_tables.len();
+        self.return_tables.push((name.into(), data));
 
-        Some(Self::DataFrame { data, defa })
+        Some(Self::DataFrame { index, defa })
     }
 
     fn data_frame_push(
@@ -206,14 +247,13 @@ impl imports::Imports for Storage {
         this: &Self::DataFrame,
         data: imports::RowParam<'_>,
     ) -> Option<u64> {
-        let mut table = this
-            .data
-            .lock()
-            .map_err(|err| {
-                log::error!("lock error: {}", err);
-                err
-            })
-            .ok()?;
+        let table = match self.return_tables.get_mut(this.index) {
+            Some(t) => &mut t.1,
+            None => {
+                log::error!("unknown return table: {}", this.index);
+                return None;
+            }
+        };
 
         let data = data
             .iter()
@@ -256,14 +296,14 @@ impl imports::Imports for Storage {
     }
 
     fn data_frame_size(&mut self, this: &Self::DataFrame) -> Option<u64> {
-        this.data
-            .lock()
-            .map_err(|err| {
-                log::error!("lock error: {}", err);
-                err
-            })
-            .ok()
-            .map(|s| s.len() as u64)
+        let table = match self.return_tables.get(this.index) {
+            Some(t) => &t.1,
+            None => {
+                log::error!("unknown return table: {}", this.index);
+                return None;
+            }
+        };
+        Some(table.len() as u64)
     }
 
     async fn storage_new(&mut self) -> Option<Self::Storage> {
@@ -281,6 +321,10 @@ impl imports::Imports for Storage {
             tag: tag.into(),
             number,
         };
+
+        let now = chrono::Local::now();
+        let v = self.statstic.entry(now.timestamp()).or_insert(0);
+        *v += 1;
 
         let data = GLOBALS
             .storage
@@ -336,6 +380,10 @@ impl imports::Imports for Storage {
             keys: keys.into_iter().map(|x| x.into()).collect(),
         };
 
+        let now = chrono::Local::now();
+        let v = self.statstic.entry(now.timestamp()).or_insert(0);
+        *v += 1;
+
         let data = GLOBALS
             .storage
             .get()
@@ -384,6 +432,10 @@ impl imports::Imports for Storage {
             keys: keys.into_iter().map(|x| x.into()).collect(),
             reversely,
         };
+
+        let now = chrono::Local::now();
+        let v = self.statstic.entry(now.timestamp()).or_insert(0);
+        *v += 1;
 
         let data = GLOBALS
             .storage
@@ -637,285 +689,3 @@ impl imports::Imports for Storage {
         }
     }
 }
-
-// #[wit_bindgen_wasmtime::async_trait]
-// impl imports::Imports for Storage {
-//     type FutureRow = FutureRow;
-//     type FutureTable = FutureTable;
-
-//     fn select_nodes(&mut self, ids: imports::SeriesId<'_>) -> i64 {
-//         if self.selected_nodes.columns.is_empty() {
-//             let n = match ids {
-//                 imports::SeriesId::I64(ids) => {
-//                     let data: Vec<i64> = ids.iter().map(|s| s.get()).collect();
-//                     self.selected_nodes.columns.push(Series {
-//                         values: Some(series::Values::Int64Values(series::Int64Series { data })),
-//                     });
-//                     ids.len()
-//                 }
-//                 imports::SeriesId::Txt(ids) => {
-//                     let data: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
-//                     self.selected_nodes.columns.push(Series {
-//                         values: Some(series::Values::StringValues(series::StringSeries { data })),
-//                     });
-//                     ids.len()
-//                 }
-//             };
-//             n as i64
-//         } else {
-//             let n = match self.selected_nodes.columns[0].values.as_mut().unwrap() {
-//                 series::Values::Int64Values(values) => match ids {
-//                     imports::SeriesId::I64(ids) => {
-//                         ids.iter().for_each(|s| {
-//                             values.data.push(s.get());
-//                         });
-//                         ids.len()
-//                     }
-//                     imports::SeriesId::Txt(_) => 0,
-//                 },
-//                 series::Values::StringValues(values) => match ids {
-//                     imports::SeriesId::I64(_) => 0,
-//                     imports::SeriesId::Txt(ids) => {
-//                         ids.iter().for_each(|s| {
-//                             values.data.push(s.to_string());
-//                         });
-//                         ids.len()
-//                     }
-//                 },
-//                 _ => 0,
-//             };
-//             n as i64
-//         }
-//     }
-
-//     fn select_edges(&mut self, src: imports::SeriesId<'_>, dst: imports::SeriesId<'_>) -> i64 {
-//         if !match &src {
-//             imports::SeriesId::I64(s) => match &dst {
-//                 imports::SeriesId::I64(d) => s.len() == d.len(),
-//                 imports::SeriesId::Txt(_) => false,
-//             },
-//             imports::SeriesId::Txt(s) => match &dst {
-//                 imports::SeriesId::I64(_) => false,
-//                 imports::SeriesId::Txt(d) => s.len() == d.len(),
-//             },
-//         } {
-//             return 0;
-//         }
-
-//         if self.selected_edges.columns.is_empty() {
-//             let n = match src {
-//                 imports::SeriesId::I64(ids) => {
-//                     let data: Vec<i64> = ids.iter().map(|s| s.get()).collect();
-//                     self.selected_edges.columns.push(Series {
-//                         values: Some(series::Values::Int64Values(series::Int64Series { data })),
-//                     });
-//                     ids.len()
-//                 }
-//                 imports::SeriesId::Txt(ids) => {
-//                     let data: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
-//                     self.selected_edges.columns.push(Series {
-//                         values: Some(series::Values::StringValues(series::StringSeries { data })),
-//                     });
-//                     ids.len()
-//                 }
-//             };
-
-//             let _ = match dst {
-//                 imports::SeriesId::I64(ids) => {
-//                     let data: Vec<i64> = ids.iter().map(|s| s.get()).collect();
-//                     self.selected_edges.columns.push(Series {
-//                         values: Some(series::Values::Int64Values(series::Int64Series { data })),
-//                     });
-//                     ids.len() as i64
-//                 }
-//                 imports::SeriesId::Txt(ids) => {
-//                     let data: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
-//                     self.selected_edges.columns.push(Series {
-//                         values: Some(series::Values::StringValues(series::StringSeries { data })),
-//                     });
-//                     ids.len() as i64
-//                 }
-//             };
-//             n as i64
-//         } else {
-//             let n = match self.selected_edges.columns[0].values.as_mut().unwrap() {
-//                 series::Values::Int64Values(values) => match src {
-//                     imports::SeriesId::I64(ids) => {
-//                         ids.iter().for_each(|s| {
-//                             values.data.push(s.get());
-//                         });
-//                         ids.len()
-//                     }
-//                     imports::SeriesId::Txt(_) => 0,
-//                 },
-//                 series::Values::StringValues(values) => match src {
-//                     imports::SeriesId::I64(_) => 0,
-//                     imports::SeriesId::Txt(ids) => {
-//                         ids.iter().for_each(|s| {
-//                             values.data.push(s.to_string());
-//                         });
-//                         ids.len()
-//                     }
-//                 },
-//                 _ => 0,
-//             };
-
-//             let _ = match self.selected_edges.columns[1].values.as_mut().unwrap() {
-//                 series::Values::Int64Values(values) => match dst {
-//                     imports::SeriesId::I64(ids) => {
-//                         ids.iter().for_each(|s| {
-//                             values.data.push(s.get());
-//                         });
-//                         ids.len()
-//                     }
-//                     imports::SeriesId::Txt(_) => 0,
-//                 },
-//                 series::Values::StringValues(values) => match dst {
-//                     imports::SeriesId::I64(_) => 0,
-//                     imports::SeriesId::Txt(ids) => {
-//                         ids.iter().for_each(|s| {
-//                             values.data.push(s.to_string());
-//                         });
-//                         ids.len()
-//                     }
-//                 },
-//                 _ => 0,
-//             };
-//             n as i64
-//         }
-//     }
-
-//     async fn async_choice_nodes(
-//         &mut self,
-//         tag: &str,
-//         number: i32,
-//     ) -> Result<Self::FutureTable, imports::FutureError> {
-//         let (tx, rx) = oneshot::channel();
-//         let query = QueryRequest::ChoiceNodes {
-//             request: ChoiceNodesRequest {
-//                 space_name: self.space_name.clone(),
-//                 tag: tag.into(),
-//                 number,
-//             },
-//             sink: tx,
-//         };
-
-//         self.io_tx
-//             .send(query)
-//             .await
-//             .map_err(|_| imports::FutureError::ChannelClosed)?;
-
-//         Ok(Self::FutureTable {
-//             rx: Mutex::new(Some(rx)),
-//         })
-//     }
-
-//     async fn async_query_node(
-//         &mut self,
-//         id: imports::NodeId<'_>,
-//         tag: &str,
-//         keys: Vec<&str>,
-//     ) -> Result<Self::FutureRow, imports::FutureError> {
-//         let (tx, rx) = oneshot::channel();
-//         let query = QueryRequest::FetchNode {
-//             request: FetchNodeRequest {
-//                 space_name: self.space_name.clone(),
-//                 node_id: Some(match id {
-//                     imports::NodeId::I64(x) => fetch_node_request::NodeId::AsInt(x),
-//                     imports::NodeId::Txt(x) => fetch_node_request::NodeId::AsStr(x.into()),
-//                 }),
-//                 tag: tag.into(),
-//                 keys: keys.into_iter().map(|x| x.into()).collect(),
-//             },
-//             sink: tx,
-//         };
-
-//         self.io_tx
-//             .send(query)
-//             .await
-//             .map_err(|_| imports::FutureError::ChannelClosed)?;
-
-//         Ok(Self::FutureRow {
-//             rx: Mutex::new(Some(rx)),
-//         })
-//     }
-
-//     async fn async_query_neighbors(
-//         &mut self,
-//         id: imports::NodeId<'_>,
-//         tag: &str,
-//         keys: Vec<&str>,
-//         reversely: bool,
-//     ) -> Result<Self::FutureTable, imports::FutureError> {
-//         let (tx, rx) = oneshot::channel();
-//         let query = QueryRequest::FetchNeighbors {
-//             request: FetchNeighborsRequest {
-//                 space_name: self.space_name.clone(),
-//                 node_id: Some(match id {
-//                     imports::NodeId::I64(x) => fetch_neighbors_request::NodeId::AsInt(x),
-//                     imports::NodeId::Txt(x) => fetch_neighbors_request::NodeId::AsStr(x.into()),
-//                 }),
-//                 tag: tag.into(),
-//                 keys: keys.into_iter().map(|x| x.into()).collect(),
-//                 reversely,
-//             },
-//             sink: tx,
-//         };
-
-//         self.io_tx
-//             .send(query)
-//             .await
-//             .map_err(|_| imports::FutureError::ChannelClosed)?;
-
-//         Ok(Self::FutureTable {
-//             rx: Mutex::new(Some(rx)),
-//         })
-//     }
-
-//     async fn async_query_kv(
-//         &mut self,
-//         keys: Vec<&str>,
-//     ) -> Result<Self::FutureRow, imports::FutureError> {
-//         let (tx, rx) = oneshot::channel();
-//         let query = QueryRequest::QueryKV {
-//             key: format!("wart:store:{}", self.token),
-//             fields: keys.into_iter().map(|x| x.into()).collect(),
-//             sink: tx,
-//         };
-
-//         self.io_tx
-//             .send(query)
-//             .await
-//             .map_err(|_| imports::FutureError::ChannelClosed)?;
-
-//         Ok(Self::FutureRow {
-//             rx: Mutex::new(Some(rx)),
-//         })
-//     }
-
-//     async fn get_future_row(
-//         &mut self,
-//         self_: &Self::FutureRow,
-//     ) -> Result<imports::Row, imports::FutureError> {
-//         let rx = match self_.rx.lock().await.take() {
-//             Some(rx) => rx,
-//             None => Err(imports::FutureError::Empty)?,
-//         };
-
-//         let (_headers, row) = rx.await.map_err(|_| imports::FutureError::ChannelDropped)?;
-//         Ok(row)
-//     }
-
-//     async fn get_future_table(
-//         &mut self,
-//         self_: &Self::FutureTable,
-//     ) -> Result<imports::Table, imports::FutureError> {
-//         let rx = match self_.rx.lock().await.take() {
-//             Some(rx) => rx,
-//             None => Err(imports::FutureError::Empty)?,
-//         };
-
-//         let (_headers, table) = rx.await.map_err(|_| imports::FutureError::ChannelDropped)?;
-//         Ok(table)
-//     }
-// }

@@ -69,7 +69,7 @@ def run():
         program = f.read()
     
     # 连接采样服务器
-    with grpc.insecure_channel("[::1]:6067") as channel:
+    with grpc.insecure_channel("[::1]:6066") as channel:
         # 创建采样客户端
         stub = WartWorkerStub(channel)
         
@@ -99,6 +99,7 @@ def run():
                 print(table)
             for s in resp.logs: # 打印日志
                 print(s)
+            print(resp.last_err)
             print(f"================{i}================")
             if i == len(args) - 1:
                 break
