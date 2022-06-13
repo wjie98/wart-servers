@@ -18,7 +18,7 @@ impl Router {
 #[tonic::async_trait]
 impl WartWorker for Router {
     type StreamingRunStream = ReceiverStream<Result<StreamingRunResponse, Status>>;
-    // type UpdateStoreStream = ReceiverStream<Result<UpdateStoreResponse, Status>>;
+    type UpdateStoreStream = ReceiverStream<Result<UpdateStoreResponse, Status>>;
     async fn open_session(
         &self,
         request: Request<OpenSessionRequest>,
@@ -47,10 +47,10 @@ impl WartWorker for Router {
         super::services::increment_epoch::increment_epoch(request).await
     }
 
-    // async fn update_store(
-    //     &self,
-    //     request: Request<Streaming<UpdateStoreRequest>>,
-    // ) -> Result<Response<Self::UpdateStoreStream>, Status> {
-    //     super::services::update_store::update_store(request).await
-    // }
+    async fn update_store(
+        &self,
+        request: Request<Streaming<UpdateStoreRequest>>,
+    ) -> Result<Response<Self::UpdateStoreStream>, Status> {
+        super::services::update_store::update_store(request).await
+    }
 }

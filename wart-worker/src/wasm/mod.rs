@@ -7,7 +7,7 @@ pub use sandbox::{Sandbox, SandboxManager};
 use wasmtime::Engine;
 use wasmtime_wasi::WasiCtxBuilder;
 
-pub mod atomic_kv;
+// pub mod atomic_kv;
 pub mod utils;
 
 use crate::GLOBALS;
@@ -25,7 +25,8 @@ pub struct Storage {
     pub token: String,
     pub return_tables: Vec<(String, BTreeMap<String, imports::VectorResult>)>,
     pub start_time: chrono::DateTime<chrono::Local>,
-    pub statstic: BTreeMap<i64, u64>,
+    // pub statstic: BTreeMap<i64, u64>,
+    pub counter: u64,
 }
 
 #[derive(Clone)]
@@ -77,7 +78,8 @@ impl StorageManager {
             token: self.token.clone(),
             return_tables: vec![],
             start_time: chrono::Local::now(),
-            statstic: Default::default(),
+            // statstic: Default::default(),
+            counter: 0,
         };
 
         self.vmm.instantiate(wasi_ctx, imports).await
@@ -156,29 +158,29 @@ impl Storage {
             tokio::task::yield_now().await;
         }
 
-        {
-            let ts = self.statstic.keys().map(|v| *v).collect();
-            let ct = self.statstic.values().map(|v| *v as i64).collect();
-            let headers = vec!["timestamp".into(), "count".into()];
-            let columns = vec![
-                Series {
-                    values: Some(series::Values::Int64Values(series::Int64Series {
-                        data: ts,
-                    })),
-                },
-                Series {
-                    values: Some(series::Values::Int64Values(series::Int64Series {
-                        data: ct,
-                    })),
-                },
-            ];
+        // {
+        //     let ts = self.statstic.keys().map(|v| *v).collect();
+        //     let ct = self.statstic.values().map(|v| *v as i64).collect();
+        //     let headers = vec!["timestamp".into(), "count".into()];
+        //     let columns = vec![
+        //         Series {
+        //             values: Some(series::Values::Int64Values(series::Int64Series {
+        //                 data: ts,
+        //             })),
+        //         },
+        //         Series {
+        //             values: Some(series::Values::Int64Values(series::Int64Series {
+        //                 data: ct,
+        //             })),
+        //         },
+        //     ];
 
-            dfs.push(DataFrame {
-                headers,
-                columns,
-                comment: "__statstic__".into(),
-            });
-        }
+        //     dfs.push(DataFrame {
+        //         headers,
+        //         columns,
+        //         comment: "__statstic__".into(),
+        //     });
+        // }
         dfs
     }
 }
@@ -322,9 +324,9 @@ impl imports::Imports for Storage {
             number,
         };
 
-        let now = chrono::Local::now();
-        let v = self.statstic.entry(now.timestamp()).or_insert(0);
-        *v += 1;
+        // let now = chrono::Local::now();
+        // let v = self.statstic.entry(now.timestamp()).or_insert(0);
+        // *v += 1;
 
         let data = GLOBALS
             .storage
@@ -348,6 +350,8 @@ impl imports::Imports for Storage {
                 log::error!("empty data in response");
                 None
             })?;
+        
+        self.counter += 1;
 
         utils::dump_to_imports_table(data)
             .into_iter()
@@ -380,9 +384,9 @@ impl imports::Imports for Storage {
             keys: keys.into_iter().map(|x| x.into()).collect(),
         };
 
-        let now = chrono::Local::now();
-        let v = self.statstic.entry(now.timestamp()).or_insert(0);
-        *v += 1;
+        // let now = chrono::Local::now();
+        // let v = self.statstic.entry(now.timestamp()).or_insert(0);
+        // *v += 1;
 
         let data = GLOBALS
             .storage
@@ -406,6 +410,8 @@ impl imports::Imports for Storage {
                 log::error!("empty data in response");
                 None
             })?;
+        
+        self.counter += 1;
 
         Some(utils::dump_to_imports_row(data))
     }
@@ -433,9 +439,9 @@ impl imports::Imports for Storage {
             reversely,
         };
 
-        let now = chrono::Local::now();
-        let v = self.statstic.entry(now.timestamp()).or_insert(0);
-        *v += 1;
+        // let now = chrono::Local::now();
+        // let v = self.statstic.entry(now.timestamp()).or_insert(0);
+        // *v += 1;
 
         let data = GLOBALS
             .storage
@@ -470,8 +476,206 @@ impl imports::Imports for Storage {
 
         let attr = it.collect::<Vec<_>>();
 
+        self.counter += 1;
+
         Some((dst, attr))
     }
+
+    // async fn storage_query_kv(
+    //     &mut self,
+    //     _this: &Self::Storage,
+    //     keys: Vec<&str>,
+    //     defva: imports::ValueParam<'_>,
+    // ) -> Option<imports::VectorResult> {
+    //     let mut con = GLOBALS
+    //         .redis
+    //         .get()
+    //         .await
+    //         .map_err(|err| {
+    //             log::error!("redis connection pool error: {}", err);
+    //         })
+    //         .ok()?;
+
+    //     let prefk = format!("wart:store:{}:", self.token);
+    //     match defva {
+    //         imports::ValueParam::Bol(x) => {
+    //             let mut data = vec![];
+    //             for field in keys.into_iter() {
+    //                 let val = atomic_kv::atomic_query_kv::<bool, _>(
+    //                     &prefk, self.epoch, &field, &x, &mut *con,
+    //                 )
+    //                 .await?;
+    //                 data.push(val);
+    //             }
+    //             Some(imports::VectorResult::Bol(data))
+    //         }
+    //         imports::ValueParam::I32(x) => {
+    //             let mut data = vec![];
+    //             for field in keys.into_iter() {
+    //                 let val = atomic_kv::atomic_query_kv::<i32, _>(
+    //                     &prefk, self.epoch, &field, &x, &mut *con,
+    //                 )
+    //                 .await?;
+    //                 data.push(val);
+    //             }
+    //             Some(imports::VectorResult::I32(data))
+    //         }
+    //         imports::ValueParam::I64(x) => {
+    //             let mut data = vec![];
+    //             for field in keys.into_iter() {
+    //                 let val = atomic_kv::atomic_query_kv::<i64, _>(
+    //                     &prefk, self.epoch, &field, &x, &mut *con,
+    //                 )
+    //                 .await?;
+    //                 data.push(val);
+    //             }
+    //             Some(imports::VectorResult::I64(data))
+    //         }
+    //         imports::ValueParam::F32(x) => {
+    //             let mut data = vec![];
+    //             for field in keys.into_iter() {
+    //                 let val = atomic_kv::atomic_query_kv::<f32, _>(
+    //                     &prefk, self.epoch, &field, &x, &mut *con,
+    //                 )
+    //                 .await?;
+    //                 data.push(val);
+    //             }
+    //             Some(imports::VectorResult::F32(data))
+    //         }
+    //         imports::ValueParam::F64(x) => {
+    //             let mut data = vec![];
+    //             for field in keys.into_iter() {
+    //                 let val = atomic_kv::atomic_query_kv::<f64, _>(
+    //                     &prefk, self.epoch, &field, &x, &mut *con,
+    //                 )
+    //                 .await?;
+    //                 data.push(val);
+    //             }
+    //             Some(imports::VectorResult::F64(data))
+    //         }
+    //         imports::ValueParam::Txt(x) => {
+    //             let mut data = vec![];
+    //             for field in keys.into_iter() {
+    //                 let val = atomic_kv::atomic_query_kv::<String, _>(
+    //                     &prefk,
+    //                     self.epoch,
+    //                     &field,
+    //                     &x.into(),
+    //                     &mut *con,
+    //                 )
+    //                 .await?;
+    //                 data.push(val);
+    //             }
+    //             Some(imports::VectorResult::Txt(data))
+    //         }
+    //         _ => None,
+    //     }
+    // }
+
+    // async fn storage_update_kv(
+    //     &mut self,
+    //     _this: &Self::Storage,
+    //     keys: Vec<&str>,
+    //     vals: imports::VectorParam<'_>,
+    //     ops: imports::MergeType,
+    // ) -> Option<u64> {
+    //     let mut con = GLOBALS
+    //         .redis
+    //         .get()
+    //         .await
+    //         .map_err(|err| {
+    //             log::error!("redis connection pool error: {}", err);
+    //         })
+    //         .ok()?;
+
+    //     let prefk = format!("wart:store:{}:", self.token);
+
+    //     match vals {
+    //         imports::VectorParam::Bol(x) => {
+    //             for (field, argum) in keys.into_iter().zip(x.into_iter()) {
+    //                 atomic_kv::atomic_update_kv::<bool, _>(
+    //                     &prefk, self.epoch, &field, &false, &argum, ops, &mut *con,
+    //                 )
+    //                 .await?;
+    //             }
+    //             Some(0)
+    //         }
+    //         imports::VectorParam::I32(x) => {
+    //             for (field, argum) in keys.into_iter().zip(x.into_iter()) {
+    //                 atomic_kv::atomic_update_kv::<i32, _>(
+    //                     &prefk,
+    //                     self.epoch,
+    //                     &field,
+    //                     &0,
+    //                     &argum.get(),
+    //                     ops,
+    //                     &mut *con,
+    //                 )
+    //                 .await?;
+    //             }
+    //             Some(0)
+    //         }
+    //         imports::VectorParam::I64(x) => {
+    //             for (field, argum) in keys.into_iter().zip(x.into_iter()) {
+    //                 atomic_kv::atomic_update_kv::<i64, _>(
+    //                     &prefk,
+    //                     self.epoch,
+    //                     &field,
+    //                     &0,
+    //                     &argum.get(),
+    //                     ops,
+    //                     &mut *con,
+    //                 )
+    //                 .await?;
+    //             }
+    //             Some(0)
+    //         }
+    //         imports::VectorParam::F32(x) => {
+    //             for (field, argum) in keys.into_iter().zip(x.into_iter()) {
+    //                 atomic_kv::atomic_update_kv::<f32, _>(
+    //                     &prefk,
+    //                     self.epoch,
+    //                     &field,
+    //                     &0.0,
+    //                     &argum.get(),
+    //                     ops,
+    //                     &mut *con,
+    //                 )
+    //                 .await?;
+    //             }
+    //             Some(0)
+    //         }
+    //         imports::VectorParam::F64(x) => {
+    //             for (field, argum) in keys.into_iter().zip(x.into_iter()) {
+    //                 atomic_kv::atomic_update_kv::<f64, _>(
+    //                     &prefk,
+    //                     self.epoch,
+    //                     &field,
+    //                     &0.0,
+    //                     &argum.get(),
+    //                     ops,
+    //                     &mut *con,
+    //                 )
+    //                 .await?;
+    //             }
+    //             Some(0)
+    //         }
+    //         imports::VectorParam::Txt(x) => {
+    //             for (field, argum) in keys.into_iter().zip(x.into_iter()) {
+    //                 let argum = argum.get(..).or_else(|| {
+    //                     log::error!("invalid string");
+    //                     None
+    //                 })?;
+    //                 atomic_kv::atomic_update_kv::<&str, _>(
+    //                     &prefk, self.epoch, &field, &"0", &argum, ops, &mut *con,
+    //                 )
+    //                 .await?;
+    //             }
+    //             Some(0)
+    //         }
+    //         _ => None,
+    //     }
+    // }
 
     async fn storage_query_kv(
         &mut self,
@@ -484,19 +688,24 @@ impl imports::Imports for Storage {
             .get()
             .await
             .map_err(|err| {
-                log::error!("redis connection pool error: {}", err);
+                log::error!("redis connection pool: {}", err);
             })
             .ok()?;
 
-        let prefk = format!("wart:store:{}:", self.token);
+        let key = format!("wart:store:{}", self.token);
         match defva {
             imports::ValueParam::Bol(x) => {
                 let mut data = vec![];
                 for field in keys.into_iter() {
-                    let val = atomic_kv::atomic_query_kv::<bool, _>(
-                        &prefk, self.epoch, &field, &x, &mut *con,
-                    )
-                    .await?;
+                    let (val,) = redis::pipe()
+                        .hget(&key, &field)
+                        .query_async(&mut *con)
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .unwrap_or((x.into(),));
                     data.push(val);
                 }
                 Some(imports::VectorResult::Bol(data))
@@ -504,10 +713,15 @@ impl imports::Imports for Storage {
             imports::ValueParam::I32(x) => {
                 let mut data = vec![];
                 for field in keys.into_iter() {
-                    let val = atomic_kv::atomic_query_kv::<i32, _>(
-                        &prefk, self.epoch, &field, &x, &mut *con,
-                    )
-                    .await?;
+                    let (val,) = redis::pipe()
+                        .hget(&key, &field)
+                        .query_async(&mut *con)
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .unwrap_or((x.into(),));
                     data.push(val);
                 }
                 Some(imports::VectorResult::I32(data))
@@ -515,10 +729,15 @@ impl imports::Imports for Storage {
             imports::ValueParam::I64(x) => {
                 let mut data = vec![];
                 for field in keys.into_iter() {
-                    let val = atomic_kv::atomic_query_kv::<i64, _>(
-                        &prefk, self.epoch, &field, &x, &mut *con,
-                    )
-                    .await?;
+                    let (val,) = redis::pipe()
+                        .hget(&key, &field)
+                        .query_async(&mut *con)
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .unwrap_or((x.into(),));
                     data.push(val);
                 }
                 Some(imports::VectorResult::I64(data))
@@ -526,10 +745,15 @@ impl imports::Imports for Storage {
             imports::ValueParam::F32(x) => {
                 let mut data = vec![];
                 for field in keys.into_iter() {
-                    let val = atomic_kv::atomic_query_kv::<f32, _>(
-                        &prefk, self.epoch, &field, &x, &mut *con,
-                    )
-                    .await?;
+                    let (val,) = redis::pipe()
+                        .hget(&key, &field)
+                        .query_async(&mut *con)
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .unwrap_or((x.into(),));
                     data.push(val);
                 }
                 Some(imports::VectorResult::F32(data))
@@ -537,10 +761,15 @@ impl imports::Imports for Storage {
             imports::ValueParam::F64(x) => {
                 let mut data = vec![];
                 for field in keys.into_iter() {
-                    let val = atomic_kv::atomic_query_kv::<f64, _>(
-                        &prefk, self.epoch, &field, &x, &mut *con,
-                    )
-                    .await?;
+                    let (val,) = redis::pipe()
+                        .hget(&key, &field)
+                        .query_async(&mut *con)
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .unwrap_or((x.into(),));
                     data.push(val);
                 }
                 Some(imports::VectorResult::F64(data))
@@ -548,14 +777,15 @@ impl imports::Imports for Storage {
             imports::ValueParam::Txt(x) => {
                 let mut data = vec![];
                 for field in keys.into_iter() {
-                    let val = atomic_kv::atomic_query_kv::<String, _>(
-                        &prefk,
-                        self.epoch,
-                        &field,
-                        &x.into(),
-                        &mut *con,
-                    )
-                    .await?;
+                    let (val,) = redis::pipe()
+                        .hget(&key, &field)
+                        .query_async(&mut *con)
+                        .await
+                        .map_err(|err| {
+                            log::error!("{}", err);
+                            err
+                        })
+                        .unwrap_or((x.into(),));
                     data.push(val);
                 }
                 Some(imports::VectorResult::Txt(data))
@@ -567,106 +797,11 @@ impl imports::Imports for Storage {
     async fn storage_update_kv(
         &mut self,
         _this: &Self::Storage,
-        keys: Vec<&str>,
-        vals: imports::VectorParam<'_>,
-        ops: imports::MergeType,
+        _keys: Vec<&str>,
+        _vals: imports::VectorParam<'_>,
+        _ops: imports::MergeType,
     ) -> Option<u64> {
-        let mut con = GLOBALS
-            .redis
-            .get()
-            .await
-            .map_err(|err| {
-                log::error!("redis connection pool error: {}", err);
-            })
-            .ok()?;
-
-        let prefk = format!("wart:store:{}:", self.token);
-
-        match vals {
-            imports::VectorParam::Bol(x) => {
-                for (field, argum) in keys.into_iter().zip(x.into_iter()) {
-                    atomic_kv::atomic_update_kv::<bool, _>(
-                        &prefk, self.epoch, &field, &false, &argum, ops, &mut *con,
-                    )
-                    .await?;
-                }
-                Some(0)
-            }
-            imports::VectorParam::I32(x) => {
-                for (field, argum) in keys.into_iter().zip(x.into_iter()) {
-                    atomic_kv::atomic_update_kv::<i32, _>(
-                        &prefk,
-                        self.epoch,
-                        &field,
-                        &0,
-                        &argum.get(),
-                        ops,
-                        &mut *con,
-                    )
-                    .await?;
-                }
-                Some(0)
-            }
-            imports::VectorParam::I64(x) => {
-                for (field, argum) in keys.into_iter().zip(x.into_iter()) {
-                    atomic_kv::atomic_update_kv::<i64, _>(
-                        &prefk,
-                        self.epoch,
-                        &field,
-                        &0,
-                        &argum.get(),
-                        ops,
-                        &mut *con,
-                    )
-                    .await?;
-                }
-                Some(0)
-            }
-            imports::VectorParam::F32(x) => {
-                for (field, argum) in keys.into_iter().zip(x.into_iter()) {
-                    atomic_kv::atomic_update_kv::<f32, _>(
-                        &prefk,
-                        self.epoch,
-                        &field,
-                        &0.0,
-                        &argum.get(),
-                        ops,
-                        &mut *con,
-                    )
-                    .await?;
-                }
-                Some(0)
-            }
-            imports::VectorParam::F64(x) => {
-                for (field, argum) in keys.into_iter().zip(x.into_iter()) {
-                    atomic_kv::atomic_update_kv::<f64, _>(
-                        &prefk,
-                        self.epoch,
-                        &field,
-                        &0.0,
-                        &argum.get(),
-                        ops,
-                        &mut *con,
-                    )
-                    .await?;
-                }
-                Some(0)
-            }
-            imports::VectorParam::Txt(x) => {
-                for (field, argum) in keys.into_iter().zip(x.into_iter()) {
-                    let argum = argum.get(..).or_else(|| {
-                        log::error!("invalid string");
-                        None
-                    })?;
-                    atomic_kv::atomic_update_kv::<&str, _>(
-                        &prefk, self.epoch, &field, &"0", &argum, ops, &mut *con,
-                    )
-                    .await?;
-                }
-                Some(0)
-            }
-            _ => None,
-        }
+        todo!()
     }
 
     async fn log(&mut self, lv: imports::LogLevel, msg: &str) {

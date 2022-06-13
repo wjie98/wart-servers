@@ -33,6 +33,15 @@ pub async fn close_session_impl(request: CloseSessionRequest) -> Result<CloseSes
             .await?;
     }
 
+    {
+        let key = format!("wart:store:{}", token);
+        redis::pipe()
+            .unlink(&key)
+            .ignore()
+            .query_async(&mut *con)
+            .await?;
+    }
+
     redis::pipe()
         .unlink(&key)
         .ignore()

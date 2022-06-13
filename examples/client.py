@@ -78,8 +78,8 @@ def run():
             space_name = "nebula:DBLPV13",
             program = program,
             # io_timeout = 1000, # 单次IO限时(废弃)
-            ex_timeout = 2000, # 单次采样限时
-            parallel = 32, # 并行执行
+            ex_timeout = 5000, # 单次采样限时
+            parallel = 64, # 并行执行
         ))
         
         token = resp.ok.token
@@ -99,7 +99,8 @@ def run():
                 print(table)
             for s in resp.logs: # 打印日志
                 print(s)
-            print(resp.last_err)
+            if resp.last_err:
+                print(resp.last_err)
             print(f"================{i}================")
             if i == len(args) - 1:
                 break

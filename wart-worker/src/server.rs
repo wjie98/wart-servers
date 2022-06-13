@@ -59,12 +59,20 @@ lazy_static! {
 
         let redis = {
             let manager = RedisConnectionManager::new(config.redis_server);
-            mobc::Pool::builder().get_timeout(None).max_open(128).build(manager)
+            mobc::Pool::builder()
+                .get_timeout(None)
+                .max_open(128)
+                .max_idle(128)
+                .build(manager)
         };
 
         let storage = {
             let manager = StorageConnectionManager::new(config.storage_server);
-            mobc::Pool::builder().get_timeout(None).max_open(8).build(manager)
+            mobc::Pool::builder()
+                .get_timeout(None)
+                .max_open(8)
+                .max_idle(8)
+                .build(manager)
         };
 
         let runtime = tokio::runtime::Builder::new_multi_thread()

@@ -173,7 +173,10 @@ async fn streaming_run_launch(
             }
 
             let storage = sandbox.store.into_data().imports;
-            let time_used = (chrono::Local::now() - storage.start_time).num_milliseconds();
+            let sta_time = storage.start_time.timestamp_millis();
+            let end_time = chrono::Local::now().timestamp_millis();
+            let counter = storage.counter as i64;
+
 
             let tables = storage.into_tables().await;
             let logs = if let Ok(it) = logs.lock() {
@@ -184,11 +187,15 @@ async fn streaming_run_launch(
                 vec![]
             };
 
+            let last_err = "".into();
+
             Ok(StreamingRunResponse {
                 tables,
                 logs,
-                time_used,
-                ..Default::default()
+                last_err,
+                sta_time,
+                end_time,
+                counter,
             })
         }
     }
